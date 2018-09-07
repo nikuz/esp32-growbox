@@ -10,7 +10,7 @@
 WiFiClient client;
 // Preferences preferences;
 
-int VERSION = 9;
+int VERSION = 10;
 const char* TAG = "growbox";
 
 // Your SSID and PSWD that the chip needs
@@ -57,7 +57,7 @@ const int ventilationCheckInterval = 60 * 10;  // check ventilation every 10 min
 const int ventilationPeriodLength = 60;        // enable ventilation every 10 minutes
                                                // for 1 minute if humidity in range
 const int ventilationHumidityMax = 70;
-const int ventilationTemperatureMax = 30;
+const int ventilationTemperatureMax = 35;
 Ticker ventilationCheckTimer;
 bool ventilationProphylaxis = false;
 
