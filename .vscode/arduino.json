@@ -1,7 +1,0 @@
-{
-    "board": "esp32:esp32:esp32",
-    "configuration": "PSRAM=disabled,PartitionScheme=default,FlashMode=dio,FlashFreq=40,FlashSize=4M,UploadSpeed=115200,DebugLevel=none",
-    "port": "/dev/cu.SLAB_USBtoUART",
-    "sketch": "esp32-growbox.ino",
-    "output": "/Users/nikolay/Documents/Arduino/builds/esp32-growbox"
-}
