@@ -81,7 +81,7 @@ bool ventilationProphylaxis = false;
 
 // light settings
 unsigned int currentHour = 35;     // some
-const int hourCheckInterval = 30;  // check current hour every 30 seconds
+const int hourCheckInterval = 5;  // check current hour every 5 seconds
 unsigned long hourCheckLastTime = millis();
 int lightDayStart = 22;  // 22:00 by default
 int lightDayEnd = 15;    // 15:00 by default
@@ -299,7 +299,7 @@ void screenRefresh() {
 void ventilationOn() {
     if (!ventilationEnabled) {
         blynkClient.terminal("Ventilation ON.");
-        digitalWrite(RELAY_2, LOW);
+        digitalWrite(RELAY_2, HIGH);
         ventilationEnabled = true;
         ventilationEnableTime = millis();
     }
@@ -308,7 +308,7 @@ void ventilationOn() {
 void ventilationOff() {
     if (ventilationEnabled) {
         blynkClient.terminal("Ventilation OFF.");
-        digitalWrite(RELAY_2, HIGH);
+        digitalWrite(RELAY_2, LOW);
         ventilationEnabled = false;
         ventilationEnableLastTime = millis();
     }
@@ -323,14 +323,14 @@ void ventilationCheck() {
 
 void lightOn() {
     if (!lightEnabled) {
-        digitalWrite(RELAY_1, LOW);
+        digitalWrite(RELAY_1, HIGH);
         lightEnabled = true;
     }
 }
 
 void lightOff() {
     if (lightEnabled) {
-        digitalWrite(RELAY_1, HIGH);
+        digitalWrite(RELAY_1, LOW);
         lightEnabled = false;
     }
 }
@@ -375,9 +375,9 @@ void blynkGetData(String& localVariable, const char* pinId, bool storePreference
 void setup() {
     // set relay off by default
     pinMode(RELAY_1, OUTPUT);
-    digitalWrite(RELAY_1, HIGH);
+    digitalWrite(RELAY_1, LOW);
     pinMode(RELAY_2, OUTPUT);
-    digitalWrite(RELAY_2, HIGH);
+    digitalWrite(RELAY_2, LOW);
 
     // Begin Serial
     Serial.begin(115200);
@@ -484,10 +484,10 @@ void loop() {
         #if PRODUCTION
         blynkClient.postData("temperature", currentTemperature);
         blynkClient.postData("humidity", currentHumidity);
-        blynkClient.postData("light", digitalRead(RELAY_1) == 1 ? 0 : 255);
+        blynkClient.postData("light", ventilationEnabled ? 255 : 0);
         blynkClient.postData("lightDayStart", lightDayStart);
         blynkClient.postData("lightDayEnd", lightDayEnd);
-        blynkClient.postData("ventilation", digitalRead(RELAY_2) == 1 ? 0 : 255);
+        blynkClient.postData("ventilation", lightEnabled ? 255 : 0);
         blynkClient.postData("ventilationTemperatureMax", ventilationTemperatureMax);
         blynkClient.postData("version", VERSION);
         blynkClient.postData("ping", 0);
