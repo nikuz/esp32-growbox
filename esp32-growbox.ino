@@ -8,18 +8,24 @@
 #include <WiFi.h>
 #include <RtcDS3231.h>
 #include <Wire.h>
+#include "def.h"
+#include "Blynk.h"
 
 WiFiClient client;
 Preferences preferences;
 
-int VERSION = 17;
+int VERSION = 22;
 const char* TAG = "growbox";
 
 // Your SSID and PSWD that the chip needs
 // to connect to
 const char* SSID = "bloom";
 const char* PSWD = "Baijeep8pai5Ie";
+#if PRODUCTION
 IPAddress ip(192, 168, 1, 100);
+#else
+IPAddress ip(192, 168, 1, 101);
+#endif
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns1(8, 8, 8, 8);  // google DNS
@@ -28,9 +34,15 @@ IPAddress dns2(8, 8, 4, 4);  // google DNS
 // OTA settings
 String otaHost = "selfproduct.com";
 const int otaPort = 80;  // Non https. For HTTPS 443. As of today, HTTPS doesn't work.
+#if PRODUCTION
 String otaBin = "/esp32-updates/growbox.bin";
+#else
+String otaBin = "/esp32-updates/growbox-dev.bin";
+#endif
 
-const char* ntpServer = "pool.ntp.org";
+const char* ntpServer = "1.rs.pool.ntp.org";
+const char* ntpServer2 = "0.europe.pool.ntp.org";
+const char* ntpServer3 = "1.europe.pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 
@@ -53,6 +65,7 @@ unsigned long DHTPReadDataLastTime = millis();
 // RtcDS3231
 RtcDS3231<TwoWire> Rtc(Wire);
 bool rtcBatteryIsLive = true;
+int rtcTemperature;
 
 // ventilation settings
 bool ventilationEnabled = false;
@@ -78,52 +91,40 @@ bool lightEnabled = false;
 #define RELAY_1 32
 #define RELAY_2 33
 
+// uptime
+String appUptime = "";
+
 // Blynk settings
-const String blynkAuth = "a6124029c59b48988fd1e4f449787ab8";
-const String blynkHost = "http://blynk-cloud.com/" + blynkAuth;
+Blynk blynkClient;
 const int blynkSyncInterval = 5;  // sync blynk state every 2 seconds
 unsigned long blynkSyncLastTime = millis();
 int pingNeedResponse = 0;
-const String blynkPinTemperature = "V0";
-const String blynkPinHumidity = "V1";
-const String blynkPinLight = "V2";
-const String blynkPinLightDayStart = "V6";
-const String blynkPinLightDayEnd = "V7";
-const String blynkPinVentilation = "V3";
-const String blynkPinVentilationTemperatureMax = "V8";
-const String blynkPinVersion = "V5";
-const String blynkPinPing = "V10";
-const String blynkPinRtcBattery = "V9";
-const String blynkPinOtaHost = "V20";
-const String blynkPinOtaBin = "V21";
-const String blynkPinTerminal = "V30";
-const String blynkPinUptime = "V11";
+
+bool firstLoop = true;
 
 EspOta otaUpdate(otaHost, otaPort, otaBin, TAG);
 U8G2_SH1106_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 16, 17, U8X8_PIN_NONE);
 
 bool timerCheck(int interval, unsigned long lastInitiate) {
-    return (interval * 1000L) < millis() && millis() - (interval * 1000L) > lastInitiate;
+    unsigned long now = millis();
+    return (interval * 1000L) < now && now - (interval * 1000L) > lastInitiate;
 }
 
-void terminalPrint(String value) {
-    Serial.println(value);
-    // HTTPClient http;
-    // http.setTimeout(2000);
-    // String requestUrl = blynGetPinUpdateUrl(blynkPinTerminal);
-    // http.begin(requestUrl);
-    // http.addHeader("Content-Type", "application/json");
-    // int httpResponseCode = http.PUT("[\"\n" + value + "\"]");
-    // if (httpResponseCode != 200) {
-    //     Serial.print("FAILED TERMINAL PUT: " + String(httpResponseCode) + ": ");
-    //     Serial.println(requestUrl);
-    // }
-    // http.end();
+void calculateUptime() {
+    char uptimeString[4];
+    const float uptime = millis() / 1000.0L / 60.0L;
+    dtostrf(uptime, 3, 1, uptimeString);
+    appUptime = uptime > 60 ? String(uptime / 60) + "h" : String(uptimeString) + "m";
+}
+
+void getRTCTemperature() {
+    RtcTemperature rtcTemp = Rtc.GetTemperature();
+    rtcTemperature = (int)rtcTemp.AsFloatDegC();
 }
 
 void wifiConnectEstablisher() {
     // Wait for connection to establish
-    Serial.println("Check WiFi connection...");
+    Serial.print("Check WiFi connection...");
     unsigned long wifiReconnectTime = millis() + wifiReconnectInterval;
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("");
@@ -144,6 +145,9 @@ void wifiConnectEstablisher() {
         Serial.println(WiFi.localIP());
         Serial.print("DNS address: ");
         Serial.println(WiFi.dnsIP());
+
+        // init and get the time
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, ntpServer2, ntpServer3);
     } else {
         Serial.println(" Already connected");
     }
@@ -152,52 +156,84 @@ void wifiConnectEstablisher() {
 void RTCUpdateByNtp() {
     RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
     if (!Rtc.IsDateTimeValid()) {
-        Serial.println("RTC lost confidence in the DateTime!");
+        blynkClient.terminal("RTC lost confidence in the DateTime!");
         Rtc.SetDateTime(compiled);
     }
     if (!Rtc.GetIsRunning()) {
-        Serial.println("RTC was not actively running, starting now");
+        blynkClient.terminal("RTC was not actively running, starting now");
         Rtc.SetIsRunning(true);
     }
     RtcDateTime now = Rtc.GetDateTime();
     if (now < compiled) {
-        Serial.println("RTC is older than compile time!  (Updating DateTime)");
+        blynkClient.terminal("RTC is older than compile time!  (Updating DateTime)");
         Rtc.SetDateTime(compiled);
     }
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) {
-        Serial.println("Failed to obtain time from NTP");
+        blynkClient.terminal("Failed to obtain time from NTP");
         return;
     }
-
+    
     Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 
     time_t ntpNow;
     time(&ntpNow);
-    unsigned long localTime = ntpNow + (gmtOffset_sec * 2);
-    Rtc.SetDateTime(localTime);
+    // unsigned long localTime = ntpNow + (gmtOffset_sec * 2);
+    Rtc.SetDateTime(ntpNow);
+}
+
+unsigned long getCurrentTime() {
+    RtcDateTime rtcTime = Rtc.GetDateTime();
+    time_t ntpTime;
+    time(&ntpTime);
+    // unsigned long int ntpTime = now + (gmtOffset_sec * 2);
+    //
+    blynkClient.terminal("rtcTimeStamp: " + String(rtcTime));
+    blynkClient.terminal("rtcTime: " + otaGetTimeStamp(rtcTime));
+    blynkClient.terminal("ntpTime: " + otaGetTimeStamp(ntpTime));
+    blynkClient.terminal("ntpTimeStamp: " + String(ntpTime));
+    //
+    if (ntpTime - rtcTime < 60) {
+        Rtc.SetDateTime(ntpTime); // correct time
+        rtcBatteryIsLive = true;
+    } else if (ntpTime - rtcTime > 60) {
+        blynkClient.terminal("RTC doesn't connect or battery down");
+        // try to set RTC datetime
+        Rtc.SetDateTime(ntpTime);
+        rtcBatteryIsLive = false;
+        return ntpTime;
+    }
+    return rtcTime;
 }
 
 int getCurrentHour() {
-    RtcDateTime currTime = Rtc.GetDateTime();
-    if (currTime.Year() < 2018) {
-        terminalPrint("RTC doesn't connect or battery down");
-        rtcBatteryIsLive = false;
-        time_t now;
-        time(&now);
-        unsigned long localTime = now + (gmtOffset_sec * 2);
-        unsigned long hours = (localTime % 86400L) / 3600;
-        return (int)hours;
-    }
-    return currTime.Hour();
+    time_t currentTime = getCurrentTime();
+    struct tm* tmstruct = localtime(&currentTime);
+    return tmstruct->tm_hour;
+}
+
+String dateCompensate(int value) {
+    return value < 10 ? "0" + String(value) : String(value);
+}
+
+String otaGetTimeStamp(time_t currentTime) {
+    struct tm* tmstruct = localtime(&currentTime);
+    String year = String(tmstruct->tm_year + 1900);
+    String month = dateCompensate(tmstruct->tm_mon + 1);
+    String day = dateCompensate(tmstruct->tm_mday);
+    String hour = dateCompensate(tmstruct->tm_hour);
+    String minute = dateCompensate(tmstruct->tm_min);
+
+    return year + "/" + month + "/" + day + " " + hour + ":" + minute;
 }
 
 void otaUpdateHandler() { 
     if (otaUpdate._host != otaHost || otaUpdate._bin != otaBin) {
         otaUpdate.updateEntries(otaHost, otaPort, otaBin);
     }
-    otaUpdate.begin();
+    // time_t currentTime = getCurrentTime() - (gmtOffset_sec * 2);
+    otaUpdate.begin(otaGetTimeStamp(getCurrentTime()));
 }
 
 void screenPrintTemperature() {
@@ -262,7 +298,7 @@ void screenRefresh() {
 
 void ventilationOn() {
     if (!ventilationEnabled) {
-        terminalPrint("Ventilation ON.");
+        blynkClient.terminal("Ventilation ON.");
         digitalWrite(RELAY_2, LOW);
         ventilationEnabled = true;
         ventilationEnableTime = millis();
@@ -271,7 +307,7 @@ void ventilationOn() {
 
 void ventilationOff() {
     if (ventilationEnabled) {
-        terminalPrint("Ventilation OFF.");
+        blynkClient.terminal("Ventilation OFF.");
         digitalWrite(RELAY_2, HIGH);
         ventilationEnabled = false;
         ventilationEnableLastTime = millis();
@@ -306,110 +342,34 @@ bool lightDayDiapasonMatch(int hour) {
     return hour >= lightDayStart && hour < lightDayEnd;
 }
 
-void blynkPingResponse() {
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.begin(blynkHost + "/notify");
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST("{ \"body\": \"PONG\"}");
-    http.end();
-}
-
-String blynkGetPinUrl(String pinId) { return blynkHost + "/get/" + pinId; }
-
-String blynGetPinUpdateUrl(String pinId) { return blynkHost + "/update/" + pinId; }
-
-String blynPutPinGetUrl(String pinId) { return blynkHost + "/update/" + pinId + "?value="; }
-
-String blynkPutPinUrl(String pinId, int value) { return blynPutPinGetUrl(pinId) + String(value); }
-
-String blynkPutPinUrl(String pinId, String value) { return blynPutPinGetUrl(pinId) + value; }
-
-String blynkGetPinData(String pinId) {
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.addHeader("Connection", "close");
-
-    const String pinUrl = blynkGetPinUrl(pinId);
-    String response = "";
-    http.begin(pinUrl);
-    int httpResponseCode = http.GET();
-    if (httpResponseCode == 200) {
-        response = http.getString();
-        response.replace("[\"", "");
-        response.replace("\"]", "");
-    } else {
-        Serial.print("FAILED GET: " + String(httpResponseCode) + ": ");
-        Serial.println(pinUrl);
-    }
-    http.end();
-
-    return response;
-}
-
-void blynkGetData(int& localVariable, String pinId, const char* preferenceItem = "none") {
-    const String pinData = blynkGetPinData(pinId);
+void blynkGetData(int& localVariable, const char* pinId, bool storePreferences = true) {
+    const String pinData = blynkClient.getData(pinId);
     if (pinData == "") {
         return;
     }
     localVariable = pinData.toInt();
-    if (preferenceItem != "none") {
+    if (storePreferences) {
         bool preferenceStarted = preferences.begin(TAG, false);
         if (preferenceStarted) {
-            preferences.putUInt(preferenceItem, pinData.toInt());
+            preferences.putUInt(pinId, pinData.toInt());
         }
         preferences.end();
     }
 }
 
-void blynkGetData(String& localVariable, String pinId, const char* preferenceItem = "none") {
-    const String pinData = blynkGetPinData(pinId);
+void blynkGetData(String& localVariable, const char* pinId, bool storePreferences = true) {
+    const String pinData = blynkClient.getData(pinId);
     if (pinData == "") {
         return;
     }
     localVariable = pinData;
-    if (preferenceItem != "none") {
+    if (storePreferences) {
         bool preferenceStarted = preferences.begin(TAG, false);
         if (preferenceStarted) {
-            preferences.putString(preferenceItem, pinData);
+            preferences.putString(pinId, pinData);
         }
         preferences.end();
     }
-}
-
-void blynkPostData() {
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.addHeader("Connection", "close");
-
-    const unsigned int uptime = millis() / 1000L / 60L;
-    const String blynkSyncUrls[] = {
-        blynkPutPinUrl(blynkPinTemperature, currentTemperature),
-        blynkPutPinUrl(blynkPinHumidity, currentHumidity),
-        blynkPutPinUrl(blynkPinLight, digitalRead(RELAY_1) == 1 ? 0 : 255),
-        blynkPutPinUrl(blynkPinLightDayStart, lightDayStart),
-        blynkPutPinUrl(blynkPinLightDayEnd, lightDayEnd),
-        blynkPutPinUrl(blynkPinVentilation, digitalRead(RELAY_2) == 1 ? 0 : 255),
-        blynkPutPinUrl(blynkPinVentilationTemperatureMax, ventilationTemperatureMax),
-        blynkPutPinUrl(blynkPinVersion, VERSION),
-        blynkPutPinUrl(blynkPinPing, 0),
-        blynkPutPinUrl(blynkPinRtcBattery, rtcBatteryIsLive ? 255 : 0),
-        blynkPutPinUrl(blynkPinOtaHost, otaHost),
-        blynkPutPinUrl(blynkPinOtaBin, otaBin),
-        blynkPutPinUrl(blynkPinUptime, uptime > 60 ? String(uptime / 60) + "h" : String(uptime) + "m"),
-    };
-
-    int urlCounts = *(&blynkSyncUrls + 1) - blynkSyncUrls;
-    for (int i = 0; i < urlCounts; i++) {
-        http.begin(blynkSyncUrls[i]);
-        int httpResponseCode = http.GET();
-        if (httpResponseCode != 200) {
-            Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
-            Serial.println(blynkSyncUrls[i]);
-        }
-    }
-    http.end();
-    blynkSyncLastTime = millis();
 }
 
 void setup() {
@@ -442,9 +402,6 @@ void setup() {
     WiFi.begin(SSID, PSWD);
     wifiConnectEstablisher();
 
-    // init and get the time
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
     wifiCheckConnectionTimer.attach(wifiCheckConnectionInterval, wifiConnectEstablisher);
     otaCheckUpdateTimer.attach(otaCheckUpdateInterval, otaUpdateHandler);
     ventilationCheckTimer.attach(ventilationCheckInterval, ventilationCheck);
@@ -463,11 +420,11 @@ void loop() {
     // temperature/humidity
     bool sameTemperature = true;
     bool sameHumidity = true;
-    if (timerCheck(DHTPReadDataInterval, DHTPReadDataLastTime)) {
+    if (timerCheck(DHTPReadDataInterval, DHTPReadDataLastTime) || firstLoop) {
         float newHumidity = dht.readHumidity();
         float newTemperature = dht.readTemperature();
         if (isnan(newHumidity) || isnan(newTemperature)) {
-            terminalPrint("Failed to read from DHT sensor!");
+            blynkClient.terminal("Failed to read from DHT sensor!");
         } else {
             if (newTemperature > ventilationTemperatureMax || newHumidity > ventilationHumidityMax) {
                 ventilationOn();
@@ -488,7 +445,7 @@ void loop() {
 
     // hour check
     bool sameHour = true;
-    if (timerCheck(hourCheckInterval, hourCheckLastTime)) {
+    if (timerCheck(hourCheckInterval, hourCheckLastTime) || firstLoop) {
         int newHour = getCurrentHour();
         if (newHour != currentHour) {
             currentHour = newHour;
@@ -507,23 +464,49 @@ void loop() {
         screenRefresh();
     }
 
-    if (timerCheck(ventilationPeriodLength, ventilationEnableTime) && ventilationProphylaxis) {
+    if ((timerCheck(ventilationPeriodLength, ventilationEnableTime) || firstLoop) && ventilationProphylaxis) {
         ventilationProphylaxis = false;
         ventilationOff();
     }
 
-    if (millis() - (blynkSyncInterval * 1000L) > blynkSyncLastTime) {
-        blynkGetData(lightDayStart, blynkPinLightDayStart, "lightDayStart");
-        blynkGetData(lightDayEnd, blynkPinLightDayEnd, "lightDayEnd");
-        blynkGetData(ventilationTemperatureMax, blynkPinVentilationTemperatureMax, "ventilationTemperatureMax");
-        blynkGetData(otaHost, blynkPinOtaHost, "otaHost");
-        blynkGetData(otaBin, blynkPinOtaBin, "otaBin");
-        blynkGetData(pingNeedResponse, blynkPinPing);
-        blynkPostData();
+    if (timerCheck(blynkSyncInterval, blynkSyncLastTime)) {
+        //
+        calculateUptime();
+        getRTCTemperature();
+        //
+        blynkGetData(lightDayStart, "lightDayStart");
+        blynkGetData(lightDayEnd, "lightDayEnd");
+        blynkGetData(ventilationTemperatureMax, "ventilationTemperatureMax");
+        blynkGetData(otaHost, "otaHost");
+        blynkGetData(otaBin, "otaBin");
+        blynkGetData(pingNeedResponse, "ping", false);
+        //
+        #if PRODUCTION
+        blynkClient.postData("temperature", currentTemperature);
+        blynkClient.postData("humidity", currentHumidity);
+        blynkClient.postData("light", digitalRead(RELAY_1) == 1 ? 0 : 255);
+        blynkClient.postData("lightDayStart", lightDayStart);
+        blynkClient.postData("lightDayEnd", lightDayEnd);
+        blynkClient.postData("ventilation", digitalRead(RELAY_2) == 1 ? 0 : 255);
+        blynkClient.postData("ventilationTemperatureMax", ventilationTemperatureMax);
+        blynkClient.postData("version", VERSION);
+        blynkClient.postData("ping", 0);
+        blynkClient.postData("rtcBattery", rtcBatteryIsLive ? 255 : 0);
+        blynkClient.postData("otaHost", otaHost);
+        blynkClient.postData("otaBin", otaBin);
+        blynkClient.postData("otaLastUpdateTime", otaUpdate.getUpdateTime());
+        blynkClient.postData("uptime", appUptime);
+        blynkClient.postData("rtcTemperature", rtcTemperature);
+        #endif
+        blynkSyncLastTime = millis();
     }
 
     if (pingNeedResponse == 1) {
         pingNeedResponse = 0;
-        blynkPingResponse();
+        blynkClient.pingResponse();
+    }
+
+    if (firstLoop) {
+        firstLoop = false;
     }
 }
