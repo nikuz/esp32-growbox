@@ -1,14 +1,14 @@
-#include "Blynk.h"
-#include "Arduino.h"
-#include <WiFi.h>
+#include <Arduino.h>
 #include <HTTPClient.h>
-#include "def.h"
 
-#if PRODUCTION
-const String auth = "a6124029c59b48988fd1e4f449787ab8";
-#else
-const String auth = "0b8cb6808d55436997f5f2568358b5c2";
-#endif
+#include "Blynk.h"
+#include "AppWiFi.h"
+#include "def.h"
+#include "BlynkDef.h"
+
+static AppWiFi appWiFiClient;
+
+// 
 const String host = "http://blynk-cloud.com/" + auth;
 const String pinTemperature = "V0";
 const String pinHumidity = "V1";
@@ -26,6 +26,7 @@ const String pinOtaLastUpdateTime = "V22";
 const String pinTerminal = "V30";
 const String pinUptime = "V11";
 const String pinRtcTemperature = "V12";
+const String pinTime = "V13";
 
 Blynk::Blynk() {}
 Blynk::~Blynk() {}
@@ -47,6 +48,7 @@ String Blynk::getPinId(String pinId) {
     if (pinId == "otaLastUpdateTime") return pinOtaLastUpdateTime;
     if (pinId == "uptime") return pinUptime;
     if (pinId == "rtcTemperature") return pinRtcTemperature;
+    if (pinId == "time") return pinTime;
 
     return "";
 }
@@ -66,17 +68,17 @@ String Blynk::putPinUrl(String pinId, String value) {
 }
 
 void Blynk::postPinData(String pinId, String data) {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!appWiFiClient.isConnected()) {
         return;
     }
     String url = this->putPinUrl(pinId, data);
 
     HTTPClient http;
     http.setTimeout(2000);
+    http.setReuse(false); // Connection: close
     http.begin(url);
-    http.addHeader("Connection", "close");
     int httpResponseCode = http.GET();
-    if (httpResponseCode != 200) {
+    if (httpResponseCode != HTTP_CODE_OK) {
         Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
         Serial.println(url);
     }
@@ -86,17 +88,17 @@ void Blynk::postPinData(String pinId, String data) {
 // public
 void Blynk::terminal(String value) {
     Serial.println(value);
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!appWiFiClient.isConnected()) {
         return;
     }
     HTTPClient http;
     http.setTimeout(2000);
+    http.setReuse(false); // Connection: close
     String requestUrl = this->getPinUpdateUrl(pinTerminal);
     http.begin(requestUrl);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("Connection", "close");
     int httpResponseCode = http.PUT("[\"\\n" + value + "\"]");
-    if (httpResponseCode != 200) {
+    if (httpResponseCode != HTTP_CODE_OK) {
         Serial.print("FAILED TERMINAL PUT: " + String(httpResponseCode) + ": ");
         Serial.println(requestUrl);
     }
@@ -104,7 +106,7 @@ void Blynk::terminal(String value) {
 }
 
 void Blynk::pingResponse() {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!appWiFiClient.isConnected()) {
         return;
     }
     HTTPClient http;
@@ -120,18 +122,18 @@ String Blynk::getData(String pinId) {
     if (blynkPin == "") {
         return "";
     }
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!appWiFiClient.isConnected()) {
         return "";
     }
     HTTPClient http;
     http.setTimeout(2000);
+    http.setReuse(false); // Connection: close
 
     const String pinUrl = this->getPinUrl(blynkPin);
     String response = "";
     http.begin(pinUrl);
-    http.addHeader("Connection", "close");
     int httpResponseCode = http.GET();
-    if (httpResponseCode == 200) {
+    if (httpResponseCode == HTTP_CODE_OK) {
         response = http.getString();
         response.replace("[\"", "");
         response.replace("\"]", "");
@@ -140,6 +142,7 @@ String Blynk::getData(String pinId) {
         Serial.println(pinUrl);
     }
     http.end();
+    Serial.println(http.connected());
 
     return response;
 }

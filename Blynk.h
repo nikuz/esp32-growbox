@@ -1,7 +1,7 @@
 #ifndef Blynk_h
 #define Blynk_h
 
-#include "Arduino.h"
+#include <Arduino.h>
 
 class Blynk {
    public:
@@ -13,6 +13,7 @@ class Blynk {
     String getData(String pinId);
     void postData(String pinId, int value);
     void postData(String pinId, String value);
+    
    private:
     String getPinId(String pinId);
     String getPinUrl(String pinId);
