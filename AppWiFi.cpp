@@ -62,6 +62,7 @@ void AppWiFi::connect() {
         const char* host = "google.com";
         if (!client.connect(host, 80)) {
             Serial.println("Google connection failed");
+            client.stop();
             this->reConnect();
             return;
         }
@@ -81,7 +82,7 @@ void AppWiFi::connect() {
             }
         }
         client.stop();
-        
+
         Serial.println(" Already connected");
     }
 }

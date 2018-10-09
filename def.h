@@ -1,5 +1,5 @@
-// #define PRODUCTION 1    // production
-#define PRODUCTION 0    // development
+#define PRODUCTION 1    // production
+// #define PRODUCTION 0    // development
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 

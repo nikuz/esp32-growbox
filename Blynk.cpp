@@ -1,5 +1,7 @@
 #include <Arduino.h>
-#include <HTTPClient.h>
+#include <WiFi.h>
+// HTTP implementation produce the "Task watchdog got triggered." error when Blynk response with 400 error
+// #include <HTTPClient.h>
 
 #include "Blynk.h"
 #include "AppWiFi.h"
@@ -8,8 +10,10 @@
 
 static AppWiFi appWiFiClient;
 
+#define TIMEOUT 2000
 // 
-const String host = "http://blynk-cloud.com/" + auth;
+// const String host = "http://blynk-cloud.com/" + auth;
+const char* host = "blynk-cloud.com";
 const String pinTemperature = "V0";
 const String pinHumidity = "V1";
 const String pinLight = "V2";
@@ -53,11 +57,11 @@ String Blynk::getPinId(String pinId) {
     return "";
 }
 
-String Blynk::getPinUrl(String pinId) { return host + "/get/" + pinId; }
+String Blynk::getPinUrl(String pinId) { return "/" + auth + "/get/" + pinId; }
 
-String Blynk::getPinUpdateUrl(String pinId) { return host + "/update/" + pinId; }
+String Blynk::getPinUpdateUrl(String pinId) { return "/" + auth + "/update/" + pinId; }
 
-String Blynk::putPinGetUrl(String pinId) { return host + "/update/" + pinId + "?value="; }
+String Blynk::putPinGetUrl(String pinId) { return "/" + auth + "/update/" + pinId + "?value="; }
 
 String Blynk::putPinUrl(String pinId, int value) { return this->putPinGetUrl(pinId) + String(value); }
 
@@ -73,48 +77,144 @@ void Blynk::postPinData(String pinId, String data) {
     }
     String url = this->putPinUrl(pinId, data);
 
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.setReuse(false); // Connection: close
-    http.begin(url);
-    int httpResponseCode = http.GET();
-    if (httpResponseCode != HTTP_CODE_OK) {
-        Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
-        Serial.println(url);
+    WiFiClient client;
+    client.setTimeout(TIMEOUT);
+    if (client.connect(host, 80)) {
+        client.println("GET " + url + " HTTP/1.1");
+        client.println(String("Host: ") + host);
+        client.println("Cache-Control: no-cache");
+        client.println("Connection: close");
+        client.println();
+
+        unsigned long requestTime = millis();
+        while (client.available() == 0) {
+            if (millis() - requestTime > TIMEOUT) {
+                Serial.println(">>> Client Timeout!");
+                break;
+            }
+        }
+
+        while(client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
+                Serial.println("FAILED POST: " + url);
+            }
+        }
     }
-    http.end();
+    client.stop();
+
+    // HTTPClient http;
+    // http.setTimeout(2000);
+    // http.setReuse(false); // Connection: close
+    // http.begin(url);
+    // int httpResponseCode = http.GET();
+    // if (httpResponseCode != HTTP_CODE_OK) {
+    //     Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
+    //     Serial.println(url);
+    // }
+    // http.end();
 }
 
 // public
 void Blynk::terminal(String value) {
     Serial.println(value);
+
     if (!appWiFiClient.isConnected()) {
         return;
     }
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.setReuse(false); // Connection: close
-    String requestUrl = this->getPinUpdateUrl(pinTerminal);
-    http.begin(requestUrl);
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.PUT("[\"\\n" + value + "\"]");
-    if (httpResponseCode != HTTP_CODE_OK) {
-        Serial.print("FAILED TERMINAL PUT: " + String(httpResponseCode) + ": ");
-        Serial.println(requestUrl);
+
+    String url = this->getPinUpdateUrl(pinTerminal);
+
+    WiFiClient client;
+    client.setTimeout(TIMEOUT);
+    if (client.connect(host, 80)) {
+        const String data = "[\"\\n" + value + "\"]";
+        client.println("PUT " + url + " HTTP/1.1");
+        client.println(String("Host: ") + host);
+        client.println("Cache-Control: no-cache");
+        client.println("Connection: close");
+        client.println("Content-Type: application/json");
+        client.print("Content-Length: ");
+        client.println(data.length());
+        client.println();
+        client.println(data);
+
+        unsigned long requestTime = millis();
+        while (client.available() == 0) {
+            if (millis() - requestTime > TIMEOUT) {
+                Serial.println(">>> Client Timeout!");
+                break;
+            }
+        }
+
+        while(client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
+                Serial.println("FAILED TERMINAL PUT: " + url);
+            }
+        }
     }
-    http.end();
+    client.stop();
+
+    // HTTPClient http;
+    // http.setTimeout(2000);
+    // http.setReuse(false); // Connection: close
+    // String requestUrl = this->getPinUpdateUrl(pinTerminal);
+    // http.begin(requestUrl);
+    // http.addHeader("Content-Type", "application/json");
+    // int httpResponseCode = http.PUT("[\"\\n" + value + "\"]");
+    // if (httpResponseCode != HTTP_CODE_OK) {
+    //     Serial.print("FAILED TERMINAL PUT: " + String(httpResponseCode) + ": ");
+    //     Serial.println(requestUrl);
+    // }
+    // http.end();
 }
 
 void Blynk::pingResponse() {
     if (!appWiFiClient.isConnected()) {
         return;
     }
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.begin(host + "/notify");
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST("{ \"body\": \"PONG\"}");
-    http.end();
+
+    WiFiClient client;
+    client.setTimeout(TIMEOUT);
+    if (client.connect(host, 80)) {
+        const String data = "{ \"body\": \"PONG\"}";
+        client.println("POST /notify HTTP/1.1");
+        client.println(String("Host: ") + host);
+        client.println("Cache-Control: no-cache");
+        client.println("Connection: close");
+        client.println("Content-Type: application/json");
+        client.print("Content-Length: ");
+        client.println(data.length());
+        client.println();
+        client.println(data);
+
+        unsigned long requestTime = millis();
+        while (client.available() == 0) {
+            if (millis() - requestTime > TIMEOUT) {
+                Serial.println(">>> Client Timeout!");
+                break;
+            }
+        }
+
+        while(client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
+                Serial.println("FAILED PONG");
+            }
+        }
+    }
+    client.stop();
+
+    // HTTPClient http;
+    // http.setTimeout(TIMEOUT);
+    // http.begin(host + "/notify");
+    // http.addHeader("Content-Type", "application/json");
+    // int httpResponseCode = http.POST("{ \"body\": \"PONG\"}");
+    // http.end();
 }
 
 String Blynk::getData(String pinId) {
@@ -125,24 +225,63 @@ String Blynk::getData(String pinId) {
     if (!appWiFiClient.isConnected()) {
         return "";
     }
-    HTTPClient http;
-    http.setTimeout(2000);
-    http.setReuse(false); // Connection: close
 
-    const String pinUrl = this->getPinUrl(blynkPin);
+    const String url = this->getPinUrl(blynkPin);
     String response = "";
-    http.begin(pinUrl);
-    int httpResponseCode = http.GET();
-    if (httpResponseCode == HTTP_CODE_OK) {
-        response = http.getString();
-        response.replace("[\"", "");
-        response.replace("\"]", "");
-    } else {
-        Serial.print("FAILED GET: " + String(httpResponseCode) + ": ");
-        Serial.println(pinUrl);
+    
+    WiFiClient client;
+    client.setTimeout(TIMEOUT);
+    if (client.connect(host, 80)) {
+        client.println("GET " + url + " HTTP/1.1");
+        client.println(String("Host: ") + host);
+        client.println("Cache-Control: no-cache");
+        client.println("Connection: close");
+        client.println();
+
+        unsigned long requestTime = millis();
+        while (client.available() == 0) {
+            if (millis() - requestTime > TIMEOUT) {
+                Serial.println(">>> Client Timeout!");
+                break;
+            }
+        }
+
+        while(client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+            response = line;
+            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
+                Serial.println("FAILED GET: " + url);
+                response = "";
+            }
+        }
+
+        if (response != "") {
+            response.replace("[\"", "");
+            response.replace("\"]", "");
+        }
     }
-    http.end();
-    Serial.println(http.connected());
+    client.stop();
+
+    return response;
+
+    // HTTPClient http;
+    // http.setTimeout(2000);
+    // http.setReuse(false); // Connection: close
+
+    // const String pinUrl = this->getPinUrl(blynkPin);
+    // String response = "";
+    // http.begin(pinUrl);
+    // int httpResponseCode = http.GET();
+    // if (httpResponseCode == HTTP_CODE_OK) {
+    //     response = http.getString();
+    //     response.replace("[\"", "");
+    //     response.replace("\"]", "");
+    // } else {
+    //     Serial.print("FAILED GET: " + String(httpResponseCode) + ": ");
+    //     Serial.println(pinUrl);
+    // }
+    // http.end();
 
     return response;
 }

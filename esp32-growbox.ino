@@ -45,8 +45,8 @@ Ticker DHTPReadDataTimer;
 
 // ventilation settings
 const int ventilationProphylaxisInterval = 60;  // check ventilation every minute
-const int ventilationHumidityMax = 70;
-int ventilationTemperatureMax = 35;
+const int ventHumMax = 70; // ventilationHumidityMax
+int ventTempMax = 35; // ventilationTemperatureMax
 Ticker ventilationProphylaxisTimer;
 
 // light settings
@@ -87,14 +87,14 @@ void screenRefresh() {
 void DHTPRead() {
     appDHT.read();
     if (
-        appDHT.temperatureMoreThan(ventilationTemperatureMax) 
-        || appDHT.humidityMoreThan(ventilationHumidityMax)
+        appDHT.temperatureMoreThan(ventTempMax) 
+        || appDHT.humidityMoreThan(ventHumMax)
     ) {
         relay.ventilationOn();
     } else if (
         !relay.isVentilationProphylaxisOn()
-        && appDHT.temperatureLessThan(ventilationTemperatureMax) 
-        && appDHT.humidityLessThan(ventilationHumidityMax)
+        && appDHT.temperatureLessThan(ventTempMax) 
+        && appDHT.humidityLessThan(ventHumMax)
     ) {
         relay.ventilationOff();
     }
@@ -145,7 +145,7 @@ void blynkGetData(String& localVariable, const char* pinId, bool storePreference
 void blynkSync() {
     blynkGetData(lightDayStart, "lightDayStart");
     blynkGetData(lightDayEnd, "lightDayEnd");
-    blynkGetData(ventilationTemperatureMax, "ventilationTemperatureMax");
+    blynkGetData(ventTempMax, "ventTempMax");
     #if PRODUCTION
     blynkGetData(otaHost, "otaHost");
     blynkGetData(otaBin, "otaBin");
@@ -172,7 +172,7 @@ void blynkSync() {
     blynkClient.postData("lightDayStart", lightDayStart);
     blynkClient.postData("lightDayEnd", lightDayEnd);
     blynkClient.postData("ventilation", relay.isVentilationOn() ? 255 : 0);
-    blynkClient.postData("ventilationTemperatureMax", ventilationTemperatureMax);
+    blynkClient.postData("ventTempMax", ventTempMax);
     blynkClient.postData("version", VERSION_MARKER + String(VERSION));
     blynkClient.postData("rtcBattery", appTime.RTCBattery() ? 255 : 0);
     blynkClient.postData("otaHost", otaHost);
@@ -198,7 +198,7 @@ void setup() {
     if (preferenceStarted) {
         lightDayStart = preferences.getUInt("lightDayStart", lightDayStart);
         lightDayEnd = preferences.getUInt("lightDayEnd", lightDayEnd);
-        ventilationTemperatureMax = preferences.getUInt("ventilationTemperatureMax", ventilationTemperatureMax);
+        ventTempMax = preferences.getUInt("ventTempMax", ventTempMax);
         #if PRODUCTION
         otaHost = preferences.getString("otaHost", otaHost);
         otaBin = preferences.getString("otaBin", otaBin);
