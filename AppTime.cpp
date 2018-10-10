@@ -46,10 +46,38 @@ void AppTime::RTCUpdateByNtp() {
         blynkClient.terminal("RTC was not actively running, starting now");
     }
     RtcDateTime now = Rtc.GetDateTime();
-    // Rtc.SetDateTime(compiled);
     if (now < compiled) {
         Rtc.SetDateTime(compiled);
         blynkClient.terminal("RTC is older than compile time!  (Updating DateTime)");
+    }
+
+    // Oct 10 2018
+    // 00:06:21
+    struct tm timeinfo = {0};
+    if (this->localTime(&timeinfo)) {
+        static const char mon_name[][4] = {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        };
+        static char ntpDate[15];
+        sprintf(
+            ntpDate,
+            "%.3s%3d %d",
+            mon_name[timeinfo.tm_mon],
+            timeinfo.tm_mday,
+            timeinfo.tm_year + 1900
+        );
+        static char ntpTime[15];
+        sprintf(
+            ntpTime, 
+            "%02u:%02u:%02u",
+            timeinfo.tm_hour,
+            timeinfo.tm_min,
+            timeinfo.tm_sec
+        );
+
+        RtcDateTime ntpDateTime = RtcDateTime(ntpDate, ntpTime);
+        Rtc.SetDateTime(ntpDateTime);
     }
 
     // never assume the Rtc was last configured by you, so
@@ -94,10 +122,14 @@ struct tm AppTime::getCurrentTime() {
         if (this->RTCIsDateTimeValid()) {
             timeinfo = this->RTCGetCurrentTime();
         } else {
-            rtcBatteryIsLive = false;
             // this->RTCBegin();
             // this->RTCUpdateByNtp();
         }
+    }
+    if (!this->RTCIsDateTimeValid()) {
+        rtcBatteryIsLive = false;
+    } else {
+        rtcBatteryIsLive = true;
     }
     
     return timeinfo;

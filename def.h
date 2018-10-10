@@ -3,7 +3,7 @@
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
-#define VERSION 26
+#define VERSION 32
 #if PRODUCTION
 #define VERSION_MARKER "P"
 #else

@@ -1,19 +1,22 @@
 #include <Arduino.h>
 #include <WiFi.h>
-// HTTP implementation produce the "Task watchdog got triggered." error when Blynk response with 400 error
+// HTTP implementation produce the "Task watchdog got triggered." error when Blynk response with 404 error
 // #include <HTTPClient.h>
 
 #include "Blynk.h"
 #include "AppWiFi.h"
+#include "AppStorage.h"
 #include "def.h"
 #include "BlynkDef.h"
 
 static AppWiFi appWiFiClient;
+static AppStorage appStorage;
 
 #define TIMEOUT 2000
 // 
-// const String host = "http://blynk-cloud.com/" + auth;
 const char* host = "blynk-cloud.com";
+// const String host = "http://blynk-cloud.com/" + auth;
+// pins
 const String pinTemperature = "V0";
 const String pinHumidity = "V1";
 const String pinLight = "V2";
@@ -32,6 +35,24 @@ const String pinUptime = "V11";
 const String pinRtcTemperature = "V12";
 const String pinTime = "V13";
 
+// cache
+int fishIntCache = -1;
+int temperatureCache = 0;
+int humidityCache = 0;
+int lightCache = 0;
+int lightDayStartCache = 0;
+int lightDayEndCache = 0;
+int ventilationCache = 0;
+int ventilationTemperatureMaxCache = 0;
+int versionCache = 0;
+int rtcBatteryCache = 0;
+int rtcTemperatureCache = 0;
+String fishStringCache = "fish";
+String otaHostCache = "";
+String otaBinCache = "";
+String otaLastUpdateTimeCache = "";
+String uptimeCache = "";
+
 Blynk::Blynk() {}
 Blynk::~Blynk() {}
 
@@ -43,7 +64,7 @@ String Blynk::getPinId(String pinId) {
     if (pinId == "lightDayStart") return pinLightDayStart;
     if (pinId == "lightDayEnd") return pinLightDayEnd;
     if (pinId == "ventilation") return pinVentilation;
-    if (pinId == "ventilationTemperatureMax") return pinVentilationTemperatureMax;
+    if (pinId == "ventTempMax") return pinVentilationTemperatureMax;
     if (pinId == "version") return pinVersion;
     if (pinId == "ping") return pinPing;
     if (pinId == "rtcBattery") return pinRtcBattery;
@@ -55,6 +76,30 @@ String Blynk::getPinId(String pinId) {
     if (pinId == "time") return pinTime;
 
     return "";
+}
+
+int& Blynk::getIntCacheValue(String pinId) {
+    if (pinId == "temperature") return temperatureCache;
+    if (pinId == "humidity") return humidityCache;
+    if (pinId == "light") return lightCache;
+    if (pinId == "lightDayStart") return lightDayStartCache;
+    if (pinId == "lightDayEnd") return lightDayEndCache;
+    if (pinId == "ventilation") return ventilationCache;
+    if (pinId == "ventTempMax") return ventilationTemperatureMaxCache;
+    if (pinId == "version") return versionCache;
+    if (pinId == "rtcBattery") return rtcBatteryCache;
+    if (pinId == "rtcTemperature") return rtcTemperatureCache;
+
+    return fishIntCache;
+}
+
+String& Blynk::getStringCacheValue(String pinId) {
+    if (pinId == "otaHost") return otaHostCache;
+    if (pinId == "otaBin") return otaBinCache;
+    if (pinId == "otaLastUpdateTime") return otaLastUpdateTimeCache;
+    if (pinId == "uptime") return uptimeCache;
+    
+    return fishStringCache;
 }
 
 String Blynk::getPinUrl(String pinId) { return "/" + auth + "/get/" + pinId; }
@@ -69,51 +114,6 @@ String Blynk::putPinUrl(String pinId, String value) {
     String valueWithEncodedSpaces = value;
     valueWithEncodedSpaces.replace(" ", "%20");
     return this->putPinGetUrl(pinId) + valueWithEncodedSpaces;
-}
-
-void Blynk::postPinData(String pinId, String data) {
-    if (!appWiFiClient.isConnected()) {
-        return;
-    }
-    String url = this->putPinUrl(pinId, data);
-
-    WiFiClient client;
-    client.setTimeout(TIMEOUT);
-    if (client.connect(host, 80)) {
-        client.println("GET " + url + " HTTP/1.1");
-        client.println(String("Host: ") + host);
-        client.println("Cache-Control: no-cache");
-        client.println("Connection: close");
-        client.println();
-
-        unsigned long requestTime = millis();
-        while (client.available() == 0) {
-            if (millis() - requestTime > TIMEOUT) {
-                Serial.println(">>> Client Timeout!");
-                break;
-            }
-        }
-
-        while(client.available()) {
-            String line = client.readStringUntil('\n');
-            line.trim();
-            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
-                Serial.println("FAILED POST: " + url);
-            }
-        }
-    }
-    client.stop();
-
-    // HTTPClient http;
-    // http.setTimeout(2000);
-    // http.setReuse(false); // Connection: close
-    // http.begin(url);
-    // int httpResponseCode = http.GET();
-    // if (httpResponseCode != HTTP_CODE_OK) {
-    //     Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
-    //     Serial.println(url);
-    // }
-    // http.end();
 }
 
 // public
@@ -180,8 +180,8 @@ void Blynk::pingResponse() {
     WiFiClient client;
     client.setTimeout(TIMEOUT);
     if (client.connect(host, 80)) {
-        const String data = "{ \"body\": \"PONG\"}";
-        client.println("POST /notify HTTP/1.1");
+        const String data = "{\"body\": \"PONG\"}";
+        client.println("POST /" + auth + "/notify HTTP/1.1");
         client.println(String("Host: ") + host);
         client.println("Cache-Control: no-cache");
         client.println("Connection: close");
@@ -217,7 +217,7 @@ void Blynk::pingResponse() {
     // http.end();
 }
 
-String Blynk::getData(String pinId) {
+String Blynk::getPinData(String pinId) {
     String blynkPin = this->getPinId(pinId);
     if (blynkPin == "") {
         return "";
@@ -286,13 +286,84 @@ String Blynk::getData(String pinId) {
     return response;
 }
 
+void Blynk::getData(int& localVariable, const char* pinId, bool storePreferences) {
+    const String pinData = this->getPinData(pinId);
+    if (pinData == "") {
+        return;
+    }
+    localVariable = pinData.toInt();
+    if (storePreferences) {
+        appStorage.putUInt(pinId, pinData.toInt());
+    }
+}
+
+void Blynk::getData(String& localVariable, const char* pinId, bool storePreferences) {
+    const String pinData = this->getPinData(pinId);
+    if (pinData == "") {
+        return;
+    }
+    localVariable = pinData;
+    if (storePreferences) {
+        appStorage.putString(pinId, pinData);
+    }
+}
+
+void Blynk::postPinData(String pinId, String data) {
+    if (!appWiFiClient.isConnected()) {
+        return;
+    }
+    String url = this->putPinUrl(pinId, data);
+
+    WiFiClient client;
+    client.setTimeout(TIMEOUT);
+    if (client.connect(host, 80)) {
+        client.println("GET " + url + " HTTP/1.1");
+        client.println(String("Host: ") + host);
+        client.println("Cache-Control: no-cache");
+        client.println("Connection: close");
+        client.println();
+
+        unsigned long requestTime = millis();
+        while (client.available() == 0) {
+            if (millis() - requestTime > TIMEOUT) {
+                Serial.println(">>> Client Timeout!");
+                break;
+            }
+        }
+
+        while(client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
+                Serial.println("FAILED POST: " + url);
+            }
+        }
+    }
+    client.stop();
+
+    // HTTPClient http;
+    // http.setTimeout(2000);
+    // http.setReuse(false); // Connection: close
+    // http.begin(url);
+    // int httpResponseCode = http.GET();
+    // if (httpResponseCode != HTTP_CODE_OK) {
+    //     Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
+    //     Serial.println(url);
+    // }
+    // http.end();
+}
+
 void Blynk::postData(String pinId, int value) {
     String blynkPin = this->getPinId(pinId);
     if (blynkPin == "") {
         return;
     }
 
-    this->postPinData(blynkPin, String(value));
+    int& cacheValue = getIntCacheValue(pinId);
+    if (cacheValue != -1 || cacheValue != value) {
+        this->postPinData(blynkPin, String(value));
+        cacheValue = value;
+    }
 }
 
 void Blynk::postData(String pinId, String value) {
@@ -301,5 +372,8 @@ void Blynk::postData(String pinId, String value) {
         return;
     }
 
-    this->postPinData(blynkPin, value);
+    String& cacheValue = getStringCacheValue(pinId);
+    if (cacheValue != "fish" || cacheValue != value) {
+        this->postPinData(blynkPin, value);
+    }
 }

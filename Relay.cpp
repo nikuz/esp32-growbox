@@ -19,8 +19,7 @@ void Relay::initiate() {
 // ventilation
 bool ventilationEnabled = false;
 bool ventilationProphylaxisEnabled = false;
-const int ventilationCheckInterval = 60 * 10;  // check ventilation every 10 minutes
-const int ventilationPeriodLength = 60;        // enable prophylaxis ventilation for 1 minute
+const int ventilationProphylaxisInterval = 60 * 10;  // enable ventilation Prophylaxis every 10 minutes
 unsigned long ventilationEnableLastTime = millis();
 
 bool Relay::isVentilationOn() {
@@ -49,7 +48,9 @@ void Relay::ventilationOff() {
 }
 
 void Relay::ventilationProphylaxis() {
-    if (millis() - (ventilationCheckInterval * 1000L) > ventilationEnableLastTime && !ventilationEnabled) {
+    const unsigned long interval = ventilationProphylaxisInterval * 1000L;
+    const unsigned long now = millis();
+    if (now - interval > 0 && now - interval > ventilationEnableLastTime && !ventilationEnabled) {
         ventilationProphylaxisEnabled = true;
         this->ventilationOn();
     } else if (ventilationProphylaxisEnabled) {

@@ -1,9 +1,9 @@
 #include <EspOta.h>
-#include <Preferences.h>
 #include <Ticker.h>
 
 #include "def.h"
 #include "AppWiFi.h"
+#include "AppStorage.h"
 #include "AppTime.h"
 #include "AppDHT.h"
 #include "Tools.h"
@@ -11,12 +11,12 @@
 #include "Relay.h"
 #include "Blynk.h"
 
-Preferences preferences;
+static AppStorage appStorage;
 static Tools tools;
 static AppTime appTime;
 static Relay relay;
 
-const char* TAG = "growbox";
+static const char* TAG = "growbox";
 
 // OTA settings
 String otaHost = "selfproduct.com";
@@ -40,7 +40,7 @@ Ticker screenRefreshTimer;
 
 // temperature/humidity settings
 static AppDHT appDHT;
-const int DHTPReadDataInterval = 1;  // read sensor once in one second
+const int DHTPReadDataInterval = 5;  // read sensor every 5 seconds
 Ticker DHTPReadDataTimer;
 
 // ventilation settings
@@ -112,59 +112,29 @@ void hourCheck() {
     }
 }
 
-void blynkGetData(int& localVariable, const char* pinId, bool storePreferences = true) {
-    const String pinData = blynkClient.getData(pinId);
-    if (pinData == "") {
-        return;
-    }
-    localVariable = pinData.toInt();
-    if (storePreferences) {
-        bool preferenceStarted = preferences.begin(TAG, false);
-        if (preferenceStarted) {
-            preferences.putUInt(pinId, pinData.toInt());
-        }
-        preferences.end();
-    }
-}
-
-void blynkGetData(String& localVariable, const char* pinId, bool storePreferences = true) {
-    const String pinData = blynkClient.getData(pinId);
-    if (pinData == "") {
-        return;
-    }
-    localVariable = pinData;
-    if (storePreferences) {
-        bool preferenceStarted = preferences.begin(TAG, false);
-        if (preferenceStarted) {
-            preferences.putString(pinId, pinData);
-        }
-        preferences.end();
-    }
-}
-
 void blynkSync() {
-    blynkGetData(lightDayStart, "lightDayStart");
-    blynkGetData(lightDayEnd, "lightDayEnd");
-    blynkGetData(ventTempMax, "ventTempMax");
+    blynkClient.getData(lightDayStart, "lightDayStart");
+    blynkClient.getData(lightDayEnd, "lightDayEnd");
+    blynkClient.getData(ventTempMax, "ventTempMax");
+    blynkClient.getData(pingNeedResponse, "ping", false);
+    blynkClient.getData(timeNeedResponse, "time", false);
     #if PRODUCTION
-    blynkGetData(otaHost, "otaHost");
-    blynkGetData(otaBin, "otaBin");
+    blynkClient.getData(otaHost, "otaHost");
+    blynkClient.getData(otaBin, "otaBin");
     #endif
-    blynkGetData(pingNeedResponse, "ping", false);
-    blynkGetData(timeNeedResponse, "time", false);
 
     if (pingNeedResponse == 1) {
         pingNeedResponse = 0;
         blynkClient.pingResponse();
+        blynkClient.postData("ping", 0);
     }
 
     if (timeNeedResponse == 1) {
         timeNeedResponse = 0;
         appTime.print();
+        blynkClient.postData("time", 0);
     }
 
-    blynkClient.postData("ping", 0);
-    blynkClient.postData("time", 0);
     #if PRODUCTION
     blynkClient.postData("temperature", appDHT.temperatureGet());
     blynkClient.postData("humidity", appDHT.humidityGet());
@@ -194,17 +164,13 @@ void setup() {
     }
 
     // restore preferences
-    bool preferenceStarted = preferences.begin(TAG, true);
-    if (preferenceStarted) {
-        lightDayStart = preferences.getUInt("lightDayStart", lightDayStart);
-        lightDayEnd = preferences.getUInt("lightDayEnd", lightDayEnd);
-        ventTempMax = preferences.getUInt("ventTempMax", ventTempMax);
-        #if PRODUCTION
-        otaHost = preferences.getString("otaHost", otaHost);
-        otaBin = preferences.getString("otaBin", otaBin);
-        #endif
-    }
-    preferences.end();
+    lightDayStart = appStorage.getUInt("lightDayStart", lightDayStart);
+    lightDayEnd = appStorage.getUInt("lightDayEnd", lightDayEnd);
+    ventTempMax = appStorage.getUInt("ventTempMax", ventTempMax);
+    #if PRODUCTION
+    otaHost = appStorage.getString("otaHost", otaHost);
+    otaBin = appStorage.getString("otaBin", otaBin);
+    #endif
 
     screen.initiate();
     appDHT.initiate();

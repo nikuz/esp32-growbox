@@ -34,22 +34,27 @@ void AppWiFi::reConnect() {
     unsigned long wifiReconnectTime = millis() + wifiReconnectInterval;
     Serial.println("");
     Serial.println("Connecting to " + String(SSID));
-    while (!this->isConnected()) {
+    const int maxReconnectAttempts = 5;
+    int reconnectAttemptIndex = 0;
+    while (!this->isConnected() && reconnectAttemptIndex < maxReconnectAttempts) {
         Serial.print(".");  // Keep the serial monitor lit!
         delay(500);
         if (wifiReconnectTime < millis()) {
             Serial.println("Wifi need to reconnect");
+            reconnectAttemptIndex += 1;
             WiFi.reconnect();
             wifiReconnectTime = millis() + wifiReconnectInterval;
         }
     }
 
-    // Connection Succeed
-    Serial.println("");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("DNS address: ");
-    Serial.println(WiFi.dnsIP());
+    if (this->isConnected()) {
+        // Connection Succeed
+        Serial.println("");
+        Serial.print("IP address: ");
+        Serial.println(WiFi.localIP());
+        Serial.print("DNS address: ");
+        Serial.println(WiFi.dnsIP());
+    }
 }
 
 void AppWiFi::connect() {
