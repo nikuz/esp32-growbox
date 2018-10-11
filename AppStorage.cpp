@@ -7,6 +7,9 @@
 static Preferences preferences;
 static const char* TAG = "gbx_storage";
 
+static StorageIntVariable intVariables[10];
+static StorageStringVariable stringVariables[10];
+
 AppStorage::AppStorage() {}
 AppStorage::~AppStorage() {}
 
@@ -44,5 +47,41 @@ void AppStorage::putString(const char* key, String value) {
     preferences.end();
 }
 
+void AppStorage::setVariable(int* var, const char* key) {
+    int urlCounts = *(&intVariables + 1) - intVariables;
+    for (int i = 0; i < urlCounts; i++) {
+        if (!intVariables[i].key) {
+            intVariables[i] = StorageIntVariable(var, key);
+            break;
+        }
+    }
+}
 
+void AppStorage::setVariable(String* var, const char* key) {
+    int urlCounts = *(&stringVariables + 1) - stringVariables;
+    for (int i = 0; i < urlCounts; i++) {
+        if (!stringVariables[i].key) {
+            stringVariables[i] = StorageStringVariable(var, key);
+            break;
+        }
+    }
+}
+
+void AppStorage::restore() {
+    if (preferences.begin(TAG, false)) {
+        int intVarsLen = *(&intVariables + 1) - intVariables;
+        for (int i = 0; i < intVarsLen; i++) {
+            if (intVariables[i].key) {
+                *intVariables[i].var = preferences.getUInt(intVariables[i].key, *intVariables[i].var);
+            }
+        }
+        int stringVarsLen = *(&stringVariables + 1) - stringVariables;
+        for (int i = 0; i < intVarsLen; i++) {
+            if (stringVariables[i].key) {
+                *stringVariables[i].var = preferences.getString(stringVariables[i].key, *stringVariables[i].var);
+            }
+        }
+    }
+    preferences.end();
+}
 

@@ -80,7 +80,7 @@ void AppWiFi::connect() {
         unsigned long timeout = millis();
         while (client.available() == 0) {
             if (millis() - timeout > 5000) {
-                Serial.println(">>> Client Timeout !");
+                Serial.println(">>> AppWiFi::connect Client Timeout !");
                 client.stop();
                 this->reConnect();
                 return;

@@ -18,3 +18,8 @@ String Tools::getUptime() {
     dtostrf(uptime, 3, 1, uptimeString);
     return uptime > 60 ? String(uptime / 60) + "h" : String(uptimeString) + "m";
 }
+
+// Utility to extract header value from headers
+String Tools::getHeaderValue(String header, String headerName) { 
+    return header.substring(strlen(headerName.c_str())); 
+}

@@ -57,10 +57,13 @@ int lightDayEnd = 15;    // 15:00 by default
 
 // Blynk settings
 static Blynk blynkClient;
-const int blynkSyncInterval = 5;  // sync blynk state every 5 seconds
+const int blynkSyncHighFreqInterval = 5;  // sync blynk state every 5 seconds
+Ticker blynkSyncHighFreqTimer;
+const int blynkSyncInterval = 60;  // sync blynk state every 5 seconds
 Ticker blynkSyncTimer;
 int pingNeedResponse = 0;
 int timeNeedResponse = 0;
+int deviceRestartNeed = 0;
 
 void wifiConnect() {
     appWiFiClient.connect();
@@ -112,16 +115,10 @@ void hourCheck() {
     }
 }
 
-void blynkSync() {
-    blynkClient.getData(lightDayStart, "lightDayStart");
-    blynkClient.getData(lightDayEnd, "lightDayEnd");
-    blynkClient.getData(ventTempMax, "ventTempMax");
-    blynkClient.getData(pingNeedResponse, "ping", false);
-    blynkClient.getData(timeNeedResponse, "time", false);
-    #if PRODUCTION
-    blynkClient.getData(otaHost, "otaHost");
-    blynkClient.getData(otaBin, "otaBin");
-    #endif
+void blynkSyncHighFreq() { // every 5 sec
+    // next function will get whole blynk project in JSON and parse it to get pins values
+    // if new pins values changed it will be stored in local variables and storage
+    blynkClient.getProject();
 
     if (pingNeedResponse == 1) {
         pingNeedResponse = 0;
@@ -135,7 +132,13 @@ void blynkSync() {
         blynkClient.postData("time", 0);
     }
 
-    #if PRODUCTION
+    if (deviceRestartNeed == 1) {
+        deviceRestartNeed = 0;
+        blynkClient.postData("restart", 0);
+        delay(2000);
+        ESP.restart();
+    }
+
     blynkClient.postData("temperature", appDHT.temperatureGet());
     blynkClient.postData("humidity", appDHT.humidityGet());
     blynkClient.postData("light", relay.isLightOn() ? 255 : 0);
@@ -143,14 +146,16 @@ void blynkSync() {
     blynkClient.postData("lightDayEnd", lightDayEnd);
     blynkClient.postData("ventilation", relay.isVentilationOn() ? 255 : 0);
     blynkClient.postData("ventTempMax", ventTempMax);
-    blynkClient.postData("version", VERSION_MARKER + String(VERSION));
     blynkClient.postData("rtcBattery", appTime.RTCBattery() ? 255 : 0);
     blynkClient.postData("otaHost", otaHost);
     blynkClient.postData("otaBin", otaBin);
+    blynkClient.postData("rtcTemperature", appTime.RTCGetTemperature());
+}
+
+void blynkSync() { // every 60 sec
     blynkClient.postData("otaLastUpdateTime", otaUpdate.getUpdateTime());
     blynkClient.postData("uptime", tools.getUptime());
-    blynkClient.postData("rtcTemperature", appTime.RTCGetTemperature());
-    #endif
+    blynkClient.postData("version", VERSION_MARKER + String(VERSION));
 }
 
 void setup() {
@@ -164,14 +169,28 @@ void setup() {
     }
 
     // restore preferences
-    lightDayStart = appStorage.getUInt("lightDayStart", lightDayStart);
-    lightDayEnd = appStorage.getUInt("lightDayEnd", lightDayEnd);
-    ventTempMax = appStorage.getUInt("ventTempMax", ventTempMax);
+    appStorage.setVariable(&lightDayStart, "lightDayStart");
+    appStorage.setVariable(&lightDayEnd, "lightDayEnd");
+    appStorage.setVariable(&ventTempMax, "ventTempMax");
     #if PRODUCTION
-    otaHost = appStorage.getString("otaHost", otaHost);
-    otaBin = appStorage.getString("otaBin", otaBin);
+    appStorage.setVariable(&otaHost, "otaHost");
+    appStorage.setVariable(&otaBin, "otaBin");
+    #endif
+    appStorage.restore();
+    
+    // register Blynk variables
+    blynkClient.setVariable(&lightDayStart, "lightDayStart");
+    blynkClient.setVariable(&lightDayEnd, "lightDayEnd");
+    blynkClient.setVariable(&ventTempMax, "ventTempMax");
+    blynkClient.setVariable(&pingNeedResponse, "ping", false);
+    blynkClient.setVariable(&timeNeedResponse, "time", false);
+    blynkClient.setVariable(&deviceRestartNeed, "restart", false);
+    #if PRODUCTION
+    blynkClient.setVariable(&otaHost, "otaHost");
+    blynkClient.setVariable(&otaBin, "otaBin");
     #endif
 
+    // intiate modules
     screen.initiate();
     appDHT.initiate();
     appWiFiClient.initiate();
@@ -180,6 +199,7 @@ void setup() {
     appTime.RTCBegin();
     appTime.RTCUpdateByNtp();
 
+    // attach timers
     wifiCheckConnectionTimer.attach(wifiCheckConnectionInterval, wifiConnect);
     //
     DHTPRead();
@@ -196,6 +216,9 @@ void setup() {
     otaUpdateHandler();
     otaCheckUpdateTimer.attach(otaCheckUpdateInterval, otaUpdateHandler);
     //
+    blynkSyncHighFreq();
+    blynkSyncHighFreqTimer.attach(blynkSyncHighFreqInterval, blynkSyncHighFreq);
+    blynkSync();
     blynkSyncTimer.attach(blynkSyncInterval, blynkSync);
 }
 

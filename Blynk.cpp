@@ -1,7 +1,9 @@
+// http responses was reworked on WiFiClient because HTTP implementation produce 
+// the "Task watchdog got triggered." error when Blynk response with 404 error
+
 #include <Arduino.h>
 #include <WiFi.h>
-// HTTP implementation produce the "Task watchdog got triggered." error when Blynk response with 404 error
-// #include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 #include "Blynk.h"
 #include "AppWiFi.h"
@@ -13,27 +15,27 @@ static AppWiFi appWiFiClient;
 static AppStorage appStorage;
 
 #define TIMEOUT 2000
-// 
 const char* host = "blynk-cloud.com";
-// const String host = "http://blynk-cloud.com/" + auth;
+
 // pins
-const String pinTemperature = "V0";
-const String pinHumidity = "V1";
-const String pinLight = "V2";
-const String pinLightDayStart = "V6";
-const String pinLightDayEnd = "V7";
-const String pinVentilation = "V3";
-const String pinVentilationTemperatureMax = "V8";
-const String pinVersion = "V5";
-const String pinPing = "V10";
-const String pinRtcBattery = "V9";
-const String pinOtaHost = "V20";
-const String pinOtaBin = "V21";
-const String pinOtaLastUpdateTime = "V22";
-const String pinTerminal = "V30";
-const String pinUptime = "V11";
-const String pinRtcTemperature = "V12";
-const String pinTime = "V13";
+const int pinTemperature = 0;
+const int pinHumidity = 1;
+const int pinLight = 2;
+const int pinLightDayStart = 6;
+const int pinLightDayEnd = 7;
+const int pinVentilation = 3;
+const int pinVentilationTemperatureMax = 8;
+const int pinVersion = 5;
+const int pinPing = 10;
+const int pinRtcBattery = 9;
+const int pinOtaHost = 20;
+const int pinOtaBin = 21;
+const int pinOtaLastUpdateTime = 22;
+const int pinTerminal = 30;
+const int pinUptime = 11;
+const int pinRtcTemperature = 12;
+const int pinTime = 13;
+const int pinRestart = 31;
 
 // cache
 int fishIntCache = -1;
@@ -53,11 +55,14 @@ String otaBinCache = "";
 String otaLastUpdateTimeCache = "";
 String uptimeCache = "";
 
+static BlynkIntVariable intVariables[10];
+static BlynkStringVariable stringVariables[10];
+
 Blynk::Blynk() {}
 Blynk::~Blynk() {}
 
 // private 
-String Blynk::getPinId(String pinId) {
+int Blynk::getPinById(String pinId) {
     if (pinId == "temperature") return pinTemperature;
     if (pinId == "humidity") return pinHumidity;
     if (pinId == "light") return pinLight;
@@ -74,6 +79,20 @@ String Blynk::getPinId(String pinId) {
     if (pinId == "uptime") return pinUptime;
     if (pinId == "rtcTemperature") return pinRtcTemperature;
     if (pinId == "time") return pinTime;
+    if (pinId == "restart") return pinRestart;
+
+    return -1;
+}
+
+char* Blynk::getIdByPin(int pin) {
+    if (pin == pinLightDayStart) return "lightDayStart";
+    if (pin == pinLightDayEnd) return "lightDayEnd";
+    if (pin == pinVentilationTemperatureMax) return "ventTempMax";
+    if (pin == pinPing) return "ping";
+    if (pin == pinTime) return "time";
+    if (pin == pinOtaHost) return "otaHost";
+    if (pin == pinOtaBin) return "otaBin";
+    if (pin == pinRestart) return "restart";
 
     return "";
 }
@@ -102,21 +121,41 @@ String& Blynk::getStringCacheValue(String pinId) {
     return fishStringCache;
 }
 
-String Blynk::getPinUrl(String pinId) { return "/" + auth + "/get/" + pinId; }
+String Blynk::getPinUrl(int pinId) { return "/" + auth + "/get/V" + pinId; }
 
-String Blynk::getPinUpdateUrl(String pinId) { return "/" + auth + "/update/" + pinId; }
+String Blynk::getPinUpdateUrl(int pinId) { return "/" + auth + "/update/V" + pinId; }
 
-String Blynk::putPinGetUrl(String pinId) { return "/" + auth + "/update/" + pinId + "?value="; }
+String Blynk::putPinGetUrl(int pinId) { return "/" + auth + "/update/V" + pinId + "?value="; }
 
-String Blynk::putPinUrl(String pinId, int value) { return this->putPinGetUrl(pinId) + String(value); }
+String Blynk::putPinUrl(int pinId, int value) { return this->putPinGetUrl(pinId) + String(value); }
 
-String Blynk::putPinUrl(String pinId, String value) {
+String Blynk::putPinUrl(int pinId, String value) {
     String valueWithEncodedSpaces = value;
     valueWithEncodedSpaces.replace(" ", "%20");
     return this->putPinGetUrl(pinId) + valueWithEncodedSpaces;
 }
 
 // public
+void Blynk::setVariable(int* var, const char* pin, bool store) {
+    int urlCounts = *(&intVariables + 1) - intVariables;
+    for (int i = 0; i < urlCounts; i++) {
+        if (!intVariables[i].pin) {
+            intVariables[i] = BlynkIntVariable(var, pin, store);
+            break;
+        }
+    }
+}
+
+void Blynk::setVariable(String* var, const char* pin, bool store) {
+    int urlCounts = *(&stringVariables + 1) - stringVariables;
+    for (int i = 0; i < urlCounts; i++) {
+        if (!stringVariables[i].pin) {
+            stringVariables[i] = BlynkStringVariable(var, pin, store);
+            break;
+        }
+    }
+}
+
 void Blynk::terminal(String value) {
     Serial.println(value);
 
@@ -143,7 +182,7 @@ void Blynk::terminal(String value) {
         unsigned long requestTime = millis();
         while (client.available() == 0) {
             if (millis() - requestTime > TIMEOUT) {
-                Serial.println(">>> Client Timeout!");
+                Serial.println(">>> Blynk::terminal Client Timeout!");
                 break;
             }
         }
@@ -157,19 +196,6 @@ void Blynk::terminal(String value) {
         }
     }
     client.stop();
-
-    // HTTPClient http;
-    // http.setTimeout(2000);
-    // http.setReuse(false); // Connection: close
-    // String requestUrl = this->getPinUpdateUrl(pinTerminal);
-    // http.begin(requestUrl);
-    // http.addHeader("Content-Type", "application/json");
-    // int httpResponseCode = http.PUT("[\"\\n" + value + "\"]");
-    // if (httpResponseCode != HTTP_CODE_OK) {
-    //     Serial.print("FAILED TERMINAL PUT: " + String(httpResponseCode) + ": ");
-    //     Serial.println(requestUrl);
-    // }
-    // http.end();
 }
 
 void Blynk::pingResponse() {
@@ -194,7 +220,7 @@ void Blynk::pingResponse() {
         unsigned long requestTime = millis();
         while (client.available() == 0) {
             if (millis() - requestTime > TIMEOUT) {
-                Serial.println(">>> Client Timeout!");
+                Serial.println(">>> Blynk::pingResponse Client Timeout!");
                 break;
             }
         }
@@ -208,18 +234,11 @@ void Blynk::pingResponse() {
         }
     }
     client.stop();
-
-    // HTTPClient http;
-    // http.setTimeout(TIMEOUT);
-    // http.begin(host + "/notify");
-    // http.addHeader("Content-Type", "application/json");
-    // int httpResponseCode = http.POST("{ \"body\": \"PONG\"}");
-    // http.end();
 }
 
 String Blynk::getPinData(String pinId) {
-    String blynkPin = this->getPinId(pinId);
-    if (blynkPin == "") {
+    int blynkPin = this->getPinById(pinId);
+    if (blynkPin == -1) {
         return "";
     }
     if (!appWiFiClient.isConnected()) {
@@ -241,7 +260,7 @@ String Blynk::getPinData(String pinId) {
         unsigned long requestTime = millis();
         while (client.available() == 0) {
             if (millis() - requestTime > TIMEOUT) {
-                Serial.println(">>> Client Timeout!");
+                Serial.println(">>> Blynk::getPinData Client Timeout!");
                 break;
             }
         }
@@ -264,26 +283,6 @@ String Blynk::getPinData(String pinId) {
     client.stop();
 
     return response;
-
-    // HTTPClient http;
-    // http.setTimeout(2000);
-    // http.setReuse(false); // Connection: close
-
-    // const String pinUrl = this->getPinUrl(blynkPin);
-    // String response = "";
-    // http.begin(pinUrl);
-    // int httpResponseCode = http.GET();
-    // if (httpResponseCode == HTTP_CODE_OK) {
-    //     response = http.getString();
-    //     response.replace("[\"", "");
-    //     response.replace("\"]", "");
-    // } else {
-    //     Serial.print("FAILED GET: " + String(httpResponseCode) + ": ");
-    //     Serial.println(pinUrl);
-    // }
-    // http.end();
-
-    return response;
 }
 
 void Blynk::getData(int& localVariable, const char* pinId, bool storePreferences) {
@@ -291,9 +290,12 @@ void Blynk::getData(int& localVariable, const char* pinId, bool storePreferences
     if (pinData == "") {
         return;
     }
-    localVariable = pinData.toInt();
-    if (storePreferences) {
-        appStorage.putUInt(pinId, pinData.toInt());
+    const int newData = pinData.toInt();
+    if (newData != localVariable) {
+        localVariable = pinData.toInt();
+        if (storePreferences) {
+            appStorage.putUInt(pinId, pinData.toInt());
+        }
     }
 }
 
@@ -302,13 +304,15 @@ void Blynk::getData(String& localVariable, const char* pinId, bool storePreferen
     if (pinData == "") {
         return;
     }
-    localVariable = pinData;
-    if (storePreferences) {
-        appStorage.putString(pinId, pinData);
+    if (pinData != localVariable) {
+        localVariable = pinData;
+        if (storePreferences) {
+            appStorage.putString(pinId, pinData);
+        }
     }
 }
 
-void Blynk::postPinData(String pinId, String data) {
+void Blynk::postPinData(int pinId, String data) {
     if (!appWiFiClient.isConnected()) {
         return;
     }
@@ -326,7 +330,7 @@ void Blynk::postPinData(String pinId, String data) {
         unsigned long requestTime = millis();
         while (client.available() == 0) {
             if (millis() - requestTime > TIMEOUT) {
-                Serial.println(">>> Client Timeout!");
+                Serial.println(">>> Blynk::postPinData Client Timeout!");
                 break;
             }
         }
@@ -340,40 +344,109 @@ void Blynk::postPinData(String pinId, String data) {
         }
     }
     client.stop();
-
-    // HTTPClient http;
-    // http.setTimeout(2000);
-    // http.setReuse(false); // Connection: close
-    // http.begin(url);
-    // int httpResponseCode = http.GET();
-    // if (httpResponseCode != HTTP_CODE_OK) {
-    //     Serial.print("FAILED POST: " + String(httpResponseCode) + ": ");
-    //     Serial.println(url);
-    // }
-    // http.end();
 }
 
 void Blynk::postData(String pinId, int value) {
-    String blynkPin = this->getPinId(pinId);
-    if (blynkPin == "") {
+    int blynkPin = this->getPinById(pinId);
+    if (blynkPin == -1) {
         return;
     }
 
     int& cacheValue = getIntCacheValue(pinId);
-    if (cacheValue != -1 || cacheValue != value) {
+    if (cacheValue != -1 || cacheValue != value) { // post data also if cache not applied for pin
         this->postPinData(blynkPin, String(value));
         cacheValue = value;
     }
 }
 
 void Blynk::postData(String pinId, String value) {
-    String blynkPin = this->getPinId(pinId);
-    if (blynkPin == "") {
+    int blynkPin = this->getPinById(pinId);
+    if (blynkPin == -1) {
         return;
     }
 
     String& cacheValue = getStringCacheValue(pinId);
-    if (cacheValue != "fish" || cacheValue != value) {
+    if (cacheValue != "fish" || cacheValue != value) { // post data also if cache not applied for pin
         this->postPinData(blynkPin, value);
+        cacheValue = value;
     }
+}
+
+void Blynk::getProject() {
+    WiFiClient client;
+    client.setTimeout(TIMEOUT);
+    if (client.connect(host, 80)) {
+        client.println("GET /" + auth + "/project HTTP/1.1");
+        client.println(String("Host: ") + host);
+        client.println("Cache-Control: no-cache");
+        client.println("Connection: close");
+        client.println("Content-Type: application/json");
+        client.println();
+
+        unsigned long requestTime = millis();
+        while (client.available() == 0) {
+            if (millis() - requestTime > TIMEOUT) {
+                Serial.println(">>> Blynk::getProject Client Timeout!");
+                break;
+            }
+        }
+
+        String response = "";
+        while(client.available()) {
+            String line = client.readStringUntil('\n');
+            line.trim();
+
+            response = line;
+            if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
+                Serial.println("FAILED GET: /project");
+                response = "";
+            }
+        }
+
+        if (response != "") {
+            // size of jsonBuffer was calculated here https://arduinojson.org/v5/assistant/
+            // and defined with a margin to future
+            DynamicJsonBuffer jsonBuffer(20000);
+            JsonObject& root = jsonBuffer.parseObject(response);
+            if (root.success()) {
+                JsonArray& widgets = root["widgets"];
+                if (widgets.success()) {
+                    for (JsonObject& elem : widgets) {
+                        const int pin = elem["pin"];
+                        const String value = elem["value"];
+                        if (pin != 0 && value != "") {
+                            const char* pinId = this->getIdByPin(pin);
+                            if (pinId != "") {
+                                const int intVarsLen = *(&intVariables + 1) - intVariables;
+                                const int intValue = value.toInt();
+                                for (int i = 0; i < intVarsLen; i++) {
+                                    if (intVariables[i].pin && intVariables[i].pin == pinId && *intVariables[i].var != intValue) {
+                                        *intVariables[i].var = intValue;
+                                        if (intVariables[i].store) {
+                                            appStorage.putUInt(pinId, intValue);
+                                        }
+                                    }
+                                }
+
+                                const int stringVarsLen = *(&stringVariables + 1) - stringVariables;
+                                for (int i = 0; i < stringVarsLen; i++) {
+                                    if (stringVariables[i].pin && stringVariables[i].pin == pinId && *stringVariables[i].var != value) {
+                                        *stringVariables[i].var = value;
+                                        if (stringVariables[i].store) {
+                                            appStorage.putString(pinId, value);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Serial.println("GET PROJECT: no widgets");
+                }
+            } else {
+                Serial.println("GET PROJECT: parseObject() failed");
+            }
+        }
+    }
+    client.stop();
 }
