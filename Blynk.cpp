@@ -17,7 +17,7 @@ static AppStorage appStorage;
 #define TIMEOUT 2000
 const char* host = "blynk-cloud.com";
 
-// pins
+// Blynk virtual pins
 const int pinTemperature = 0;
 const int pinHumidity = 1;
 const int pinLight = 2;
@@ -25,6 +25,7 @@ const int pinLightDayStart = 6;
 const int pinLightDayEnd = 7;
 const int pinVentilation = 3;
 const int pinVentilationTemperatureMax = 8;
+const int pinVentilationHumidityMax = 14;
 const int pinVersion = 5;
 const int pinPing = 10;
 const int pinRtcBattery = 9;
@@ -36,6 +37,9 @@ const int pinUptime = 11;
 const int pinRtcTemperature = 12;
 const int pinTime = 13;
 const int pinRestart = 31;
+const int pinHumidityWater = 15;
+const int pinSoilMoisture1 = 16;
+const int pinSoilMoisture2 = 17;
 
 // cache
 int fishIntCache = -1;
@@ -46,9 +50,13 @@ int lightDayStartCache = 0;
 int lightDayEndCache = 0;
 int ventilationCache = 0;
 int ventilationTemperatureMaxCache = 0;
+int ventilationHumidityMaxCache = 0;
 int versionCache = 0;
 int rtcBatteryCache = 0;
 int rtcTemperatureCache = 0;
+int humidityWaterCache = 0;
+int soilMoistureCache1 = 0;
+int soilMoistureCache2 = 0;
 String fishStringCache = "fish";
 String otaHostCache = "";
 String otaBinCache = "";
@@ -70,6 +78,7 @@ int Blynk::getPinById(String pinId) {
     if (pinId == "lightDayEnd") return pinLightDayEnd;
     if (pinId == "ventilation") return pinVentilation;
     if (pinId == "ventTempMax") return pinVentilationTemperatureMax;
+    if (pinId == "ventHumMax") return pinVentilationHumidityMax;
     if (pinId == "version") return pinVersion;
     if (pinId == "ping") return pinPing;
     if (pinId == "rtcBattery") return pinRtcBattery;
@@ -80,6 +89,9 @@ int Blynk::getPinById(String pinId) {
     if (pinId == "rtcTemperature") return pinRtcTemperature;
     if (pinId == "time") return pinTime;
     if (pinId == "restart") return pinRestart;
+    if (pinId == "humidityWater") return pinHumidityWater;
+    if (pinId == "soilMoisture1") return pinSoilMoisture1;
+    if (pinId == "soilMoisture2") return pinSoilMoisture2;
 
     return -1;
 }
@@ -88,6 +100,7 @@ char* Blynk::getIdByPin(int pin) {
     if (pin == pinLightDayStart) return "lightDayStart";
     if (pin == pinLightDayEnd) return "lightDayEnd";
     if (pin == pinVentilationTemperatureMax) return "ventTempMax";
+    if (pin == pinVentilationHumidityMax) return "ventHumMax";
     if (pin == pinPing) return "ping";
     if (pin == pinTime) return "time";
     if (pin == pinOtaHost) return "otaHost";
@@ -105,9 +118,13 @@ int& Blynk::getIntCacheValue(String pinId) {
     if (pinId == "lightDayEnd") return lightDayEndCache;
     if (pinId == "ventilation") return ventilationCache;
     if (pinId == "ventTempMax") return ventilationTemperatureMaxCache;
+    if (pinId == "ventHumMax") return ventilationHumidityMaxCache;
     if (pinId == "version") return versionCache;
     if (pinId == "rtcBattery") return rtcBatteryCache;
     if (pinId == "rtcTemperature") return rtcTemperatureCache;
+    if (pinId == "humidityWater") return humidityWaterCache;
+    if (pinId == "soilMoisture1") return soilMoistureCache1;
+    if (pinId == "soilMoisture2") return soilMoistureCache2;
 
     return fishIntCache;
 }
@@ -198,7 +215,7 @@ void Blynk::terminal(String value) {
     client.stop();
 }
 
-void Blynk::pingResponse() {
+void Blynk::notification(String message) {
     if (!appWiFiClient.isConnected()) {
         return;
     }
@@ -206,7 +223,12 @@ void Blynk::pingResponse() {
     WiFiClient client;
     client.setTimeout(TIMEOUT);
     if (client.connect(host, 80)) {
-        const String data = "{\"body\": \"PONG\"}";
+        #if PRODUCTION
+        const String devMarker = "";
+        #else
+        const String devMarker = "-DEV";
+        #endif
+        const String data = "{\"body\": \"GROWBOX" + devMarker + ": " + message + "\"}";
         client.println("POST /" + auth + "/notify HTTP/1.1");
         client.println(String("Host: ") + host);
         client.println("Cache-Control: no-cache");
@@ -220,7 +242,7 @@ void Blynk::pingResponse() {
         unsigned long requestTime = millis();
         while (client.available() == 0) {
             if (millis() - requestTime > TIMEOUT) {
-                Serial.println(">>> Blynk::pingResponse Client Timeout!");
+                Serial.println(">>> Blynk::notification Client Timeout!");
                 break;
             }
         }
@@ -229,7 +251,7 @@ void Blynk::pingResponse() {
             String line = client.readStringUntil('\n');
             line.trim();
             if (line.startsWith("HTTP/1.1") && line.indexOf("200") < 0) {
-                Serial.println("FAILED PONG");
+                Serial.println("FAILED BLYNK NOTIFICATION");
             }
         }
     }

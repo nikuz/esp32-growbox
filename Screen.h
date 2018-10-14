@@ -15,6 +15,7 @@ class Screen {
     void printDayStrip(int currentHour, int lightDayStart, int lightDayEnd);
     void printAppVersion();
     void printTime(struct tm localtime);
+    void printHumidityWater(bool hasWater);
 };
 
 #endif /* Screen_h */

@@ -27,7 +27,7 @@ class Blynk {
     ~Blynk();
 
     void terminal(String value);
-    void pingResponse();
+    void notification(String message);
     void getData(int& localVariable, const char* pinId, bool storePreferences = true);
     void getData(String& localVariable, const char* pinId, bool storePreferences = true);
     void postData(String pinId, int value);

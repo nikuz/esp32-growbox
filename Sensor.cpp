@@ -2,7 +2,7 @@
 #include <DHT.h>
 
 #include "def.h"
-#include "AppDHT.h"
+#include "Sensor.h"
 #include "Blynk.h"
 
 static Blynk blynkClient;
@@ -12,16 +12,17 @@ static DHT dht(DHTPin, DHTTYPE);
 float currentTemperature = 0;
 float currentHumidity = 0;
 
-AppDHT::AppDHT() {}
-AppDHT::~AppDHT() {}
+Sensor::Sensor() {}
+Sensor::~Sensor() {}
 
-void AppDHT::initiate() {
+void Sensor::initiate() {
     dht.begin();
+    pinMode(HUMIDITY_WATER_SENSOR, INPUT);
 }
 
 // temperature
 
-void AppDHT::temperatureRead() {
+void Sensor::temperatureRead() {
     float newTemperature = dht.readTemperature();
     if (isnan(newTemperature)) {
         blynkClient.terminal("Failed to read from DHT sensor!");
@@ -30,27 +31,27 @@ void AppDHT::temperatureRead() {
     }
 }
 
-float AppDHT::temperatureGet() {
+float Sensor::temperatureGet() {
     return currentTemperature;
 }
 
-bool AppDHT::temperatureMoreThan(int maxValue) {
+bool Sensor::temperatureMoreThan(int maxValue) {
     float newTemperature = this->temperatureGet();
     return newTemperature > maxValue;
 }
 
-bool AppDHT::temperatureLessThan(int maxValue) {
+bool Sensor::temperatureLessThan(int maxValue) {
     float newTemperature = this->temperatureGet();
     return newTemperature <= maxValue;
 }
 
 // humidity
 
-float AppDHT::humidityGet() {
+float Sensor::humidityGet() {
     return currentHumidity;
 }
 
-void AppDHT::humidityRead() {
+void Sensor::humidityRead() {
     float newHumidity = dht.readHumidity();
     if (isnan(newHumidity)) {
         blynkClient.terminal("Failed to read from DHT sensor!");
@@ -59,17 +60,37 @@ void AppDHT::humidityRead() {
     }
 }
 
-bool AppDHT::humidityMoreThan(int minValue) {
+bool Sensor::humidityMoreThan(int minValue) {
     float newHumidity = this->humidityGet();
     return newHumidity > minValue;
 }
 
-bool AppDHT::humidityLessThan(int minValue) {
+bool Sensor::humidityLessThan(int minValue) {
     float newHumidity = this->humidityGet();
     return newHumidity <= minValue;
 }
 
-void AppDHT::read() {
+void Sensor::readDHT() {
     this->temperatureRead();
     this->humidityRead();
+}
+
+bool Sensor::humidityHasWater() {
+    int hasWater = digitalRead(HUMIDITY_WATER_SENSOR);
+    return hasWater ? true : false;
+}
+
+unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
+    int value = analogRead(sensorId);
+    
+    if (value) {
+        value = map(analogRead(sensorId), min, max, 0, 100);
+        if (value < 0) {
+            value = 0;
+        } else if (value > 100) {
+            value = 100;
+        }
+    }
+
+    return value;
 }

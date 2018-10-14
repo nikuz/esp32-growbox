@@ -102,3 +102,20 @@ void Screen::printTime(struct tm localtime) {
     u8g2.setCursor(0, displayHeight);
     u8g2.print(appTime.getTimeString(localtime, "%02u/%02u/%04u %02u:%02u"));
 }
+
+void Screen::printHumidityWater(bool hasWater) {
+    const int line = 47;
+    u8g2.setFont(u8g2_font_crox2cb_tr);
+    u8g2.setCursor(0, line);
+    const char marker[] = "H";
+    const int markerWidth = u8g2.getStrWidth(marker);
+    const int radius = 5;
+    const int left = markerWidth + radius + 2;
+    const int top = line - radius;
+    u8g2.print(marker);
+    if (hasWater) {
+        u8g2.drawDisc(left, top, radius, U8G2_DRAW_ALL);
+    } else {
+        u8g2.drawCircle(left, top, radius, U8G2_DRAW_ALL);
+    }
+}

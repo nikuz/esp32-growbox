@@ -1,12 +1,12 @@
-#ifndef AppDHT_h
-#define AppDHT_h
+#ifndef Sensor_h
+#define Sensor_h
 
 #include <Arduino.h>
 
-class AppDHT {
+class Sensor {
    public:
-    AppDHT();
-    ~AppDHT();
+    Sensor();
+    ~Sensor();
 
     void initiate();
     
@@ -20,7 +20,10 @@ class AppDHT {
     bool humidityMoreThan(int maxValue);
     bool humidityLessThan(int minValue);
 
-    void read();
+    void readDHT();
+
+    bool humidityHasWater();
+    unsigned int getSoilMoisture(int sensorId, int min, int max);
 };
 
-#endif /* AppDHT_h */
+#endif /* Sensor_h */

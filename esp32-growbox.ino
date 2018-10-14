@@ -5,7 +5,7 @@
 #include "AppWiFi.h"
 #include "AppStorage.h"
 #include "AppTime.h"
-#include "AppDHT.h"
+#include "Sensor.h"
 #include "Tools.h"
 #include "Screen.h"
 #include "Relay.h"
@@ -39,13 +39,13 @@ const int screenRefreshInterval = 5; // refresh screen every 5 seconds
 Ticker screenRefreshTimer;
 
 // temperature/humidity settings
-static AppDHT appDHT;
-const int DHTPReadDataInterval = 5;  // read sensor every 5 seconds
-Ticker DHTPReadDataTimer;
+static Sensor sensor;
+const int sensorsReadInterval = 5;  // read sensor every 5 seconds
+Ticker sensorsReadTimer;
 
 // ventilation settings
 const int ventilationProphylaxisInterval = 60;  // check ventilation every minute
-const int ventHumMax = 70; // ventilationHumidityMax
+int ventHumMax = 40; // ventilationHumidityMax
 int ventTempMax = 35; // ventilationTemperatureMax
 Ticker ventilationProphylaxisTimer;
 
@@ -64,6 +64,7 @@ Ticker blynkSyncTimer;
 int pingNeedResponse = 0;
 int timeNeedResponse = 0;
 int deviceRestartNeed = 0;
+bool noHumidityWaterNotificationSended = false;
 
 void wifiConnect() {
     appWiFiClient.connect();
@@ -78,28 +79,33 @@ void otaUpdateHandler() {
 
 void screenRefresh() {
     screen.clearBuffer();
-    screen.printTemperature(appDHT.temperatureGet(), appDHT.humidityGet());
+    screen.printTemperature(sensor.temperatureGet(), sensor.humidityGet());
     screen.printDayStrip(appTime.getCurrentHour(), lightDayStart, lightDayEnd);
     screen.printAppVersion();
     screen.printTime(appTime.getCurrentTime());
+    screen.printHumidityWater(sensor.humidityHasWater());
     screen.sendBuffer();
-    //
-    // appTime.print();
 }
 
-void DHTPRead() {
-    appDHT.read();
+void sensorsRead() {
+    sensor.readDHT();
     if (
-        appDHT.temperatureMoreThan(ventTempMax) 
-        || appDHT.humidityMoreThan(ventHumMax)
+        sensor.temperatureMoreThan(ventTempMax) 
+        || sensor.humidityMoreThan(ventHumMax + 10)
     ) {
         relay.ventilationOn();
     } else if (
         !relay.isVentilationProphylaxisOn()
-        && appDHT.temperatureLessThan(ventTempMax) 
-        && appDHT.humidityLessThan(ventHumMax)
+        && sensor.temperatureLessThan(ventTempMax) 
+        && sensor.humidityLessThan(ventHumMax + 10)
     ) {
         relay.ventilationOff();
+    }
+
+    if (sensor.humidityLessThan(ventHumMax - 10) && sensor.humidityHasWater()) {
+        relay.humidityOn();
+    } else if (sensor.humidityMoreThan(ventHumMax)) {
+        relay.humidityOff();
     }
 }
 
@@ -122,7 +128,7 @@ void blynkSyncHighFreq() { // every 5 sec
 
     if (pingNeedResponse == 1) {
         pingNeedResponse = 0;
-        blynkClient.pingResponse();
+        blynkClient.notification("PONG");
         blynkClient.postData("ping", 0);
     }
 
@@ -139,17 +145,29 @@ void blynkSyncHighFreq() { // every 5 sec
         ESP.restart();
     }
 
-    blynkClient.postData("temperature", appDHT.temperatureGet());
-    blynkClient.postData("humidity", appDHT.humidityGet());
+    bool humidityHasWater = sensor.humidityHasWater();
+    #if PRODUCTION
+    if (!humidityHasWater && !noHumidityWaterNotificationSended) {
+        blynkClient.notification("Humidity has no water");
+        noHumidityWaterNotificationSended = true;
+    }
+    #endif
+
+    blynkClient.postData("temperature", sensor.temperatureGet());
+    blynkClient.postData("humidity", sensor.humidityGet());
     blynkClient.postData("light", relay.isLightOn() ? 255 : 0);
     blynkClient.postData("lightDayStart", lightDayStart);
     blynkClient.postData("lightDayEnd", lightDayEnd);
     blynkClient.postData("ventilation", relay.isVentilationOn() ? 255 : 0);
     blynkClient.postData("ventTempMax", ventTempMax);
+    blynkClient.postData("ventHumMax", ventHumMax);
     blynkClient.postData("rtcBattery", appTime.RTCBattery() ? 255 : 0);
     blynkClient.postData("otaHost", otaHost);
     blynkClient.postData("otaBin", otaBin);
     blynkClient.postData("rtcTemperature", appTime.RTCGetTemperature());
+    blynkClient.postData("humidityWater", humidityHasWater ? 255 : 0);
+    blynkClient.postData("soilMoisture1", sensor.getSoilMoisture(SOIL_SENSOR_1, SOIL_SENSOR_1_MIN, SOIL_SENSOR_1_MAX));
+    blynkClient.postData("soilMoisture2", sensor.getSoilMoisture(SOIL_SENSOR_2, SOIL_SENSOR_2_MIN, SOIL_SENSOR_2_MAX));
 }
 
 void blynkSync() { // every 60 sec
@@ -172,6 +190,7 @@ void setup() {
     appStorage.setVariable(&lightDayStart, "lightDayStart");
     appStorage.setVariable(&lightDayEnd, "lightDayEnd");
     appStorage.setVariable(&ventTempMax, "ventTempMax");
+    appStorage.setVariable(&ventHumMax, "ventHumMax");
     #if PRODUCTION
     appStorage.setVariable(&otaHost, "otaHost");
     appStorage.setVariable(&otaBin, "otaBin");
@@ -182,6 +201,7 @@ void setup() {
     blynkClient.setVariable(&lightDayStart, "lightDayStart");
     blynkClient.setVariable(&lightDayEnd, "lightDayEnd");
     blynkClient.setVariable(&ventTempMax, "ventTempMax");
+    blynkClient.setVariable(&ventHumMax, "ventHumMax");
     blynkClient.setVariable(&pingNeedResponse, "ping", false);
     blynkClient.setVariable(&timeNeedResponse, "time", false);
     blynkClient.setVariable(&deviceRestartNeed, "restart", false);
@@ -192,7 +212,7 @@ void setup() {
 
     // intiate modules
     screen.initiate();
-    appDHT.initiate();
+    sensor.initiate();
     appWiFiClient.initiate();
     appWiFiClient.connect();
     appTime.obtainSNTP();
@@ -202,8 +222,8 @@ void setup() {
     // attach timers
     wifiCheckConnectionTimer.attach(wifiCheckConnectionInterval, wifiConnect);
     //
-    DHTPRead();
-    DHTPReadDataTimer.attach(DHTPReadDataInterval, DHTPRead);
+    sensorsRead();
+    sensorsReadTimer.attach(sensorsReadInterval, sensorsRead);
     //
     screenRefresh();
     screenRefreshTimer.attach(screenRefreshInterval, screenRefresh);
