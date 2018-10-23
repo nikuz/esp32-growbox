@@ -150,6 +150,8 @@ void blynkSyncHighFreq() { // every 5 sec
     if (!humidityHasWater && !noHumidityWaterNotificationSended) {
         blynkClient.notification("Humidity has no water");
         noHumidityWaterNotificationSended = true;
+    } else if (humidityHasWater && noHumidityWaterNotificationSended) {
+        noHumidityWaterNotificationSended = false;
     }
     #endif
 

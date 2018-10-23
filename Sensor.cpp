@@ -84,7 +84,7 @@ unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
     int value = analogRead(sensorId);
     
     if (value) {
-        value = map(analogRead(sensorId), min, max, 0, 100);
+        value = map(value, min, max, 0, 100);
         if (value < 0) {
             value = 0;
         } else if (value > 100) {
