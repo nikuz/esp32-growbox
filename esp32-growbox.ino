@@ -170,6 +170,8 @@ void blynkSyncHighFreq() { // every 5 sec
     blynkClient.postData("humidityWater", humidityHasWater ? 255 : 0);
     blynkClient.postData("soilMoisture1", sensor.getSoilMoisture(SOIL_SENSOR_1, SOIL_SENSOR_1_MIN, SOIL_SENSOR_1_MAX));
     blynkClient.postData("soilMoisture2", sensor.getSoilMoisture(SOIL_SENSOR_2, SOIL_SENSOR_2_MIN, SOIL_SENSOR_2_MAX));
+    blynkClient.postData("soilMoisture3", sensor.getSoilMoisture(SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX));
+    blynkClient.postData("soilMoisture4", sensor.getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX));
 }
 
 void blynkSync() { // every 60 sec

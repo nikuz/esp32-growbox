@@ -40,6 +40,8 @@ const int pinRestart = 31;
 const int pinHumidityWater = 15;
 const int pinSoilMoisture1 = 16;
 const int pinSoilMoisture2 = 17;
+const int pinSoilMoisture3 = 18;
+const int pinSoilMoisture4 = 19;
 
 // cache
 int fishIntCache = -1;
@@ -57,6 +59,8 @@ int rtcTemperatureCache = 0;
 int humidityWaterCache = 0;
 int soilMoistureCache1 = 0;
 int soilMoistureCache2 = 0;
+int soilMoistureCache3 = 0;
+int soilMoistureCache4 = 0;
 String fishStringCache = "fish";
 String otaHostCache = "";
 String otaBinCache = "";
@@ -92,6 +96,8 @@ int Blynk::getPinById(String pinId) {
     if (pinId == "humidityWater") return pinHumidityWater;
     if (pinId == "soilMoisture1") return pinSoilMoisture1;
     if (pinId == "soilMoisture2") return pinSoilMoisture2;
+    if (pinId == "soilMoisture3") return pinSoilMoisture3;
+    if (pinId == "soilMoisture4") return pinSoilMoisture4;
 
     return -1;
 }
@@ -125,6 +131,8 @@ int& Blynk::getIntCacheValue(String pinId) {
     if (pinId == "humidityWater") return humidityWaterCache;
     if (pinId == "soilMoisture1") return soilMoistureCache1;
     if (pinId == "soilMoisture2") return soilMoistureCache2;
+    if (pinId == "soilMoisture3") return soilMoistureCache3;
+    if (pinId == "soilMoisture4") return soilMoistureCache4;
 
     return fishIntCache;
 }

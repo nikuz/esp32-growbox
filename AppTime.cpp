@@ -15,7 +15,7 @@ const char* ntpServer = "1.rs.pool.ntp.org";
 const char* ntpServer2 = "0.europe.pool.ntp.org";
 const char* ntpServer3 = "1.europe.pool.ntp.org";
 const long gmtOffset_sec = 3600;
-const int daylightOffset_sec = 3600;
+const int daylightOffset_sec = 0;
 
 RtcDS3231<TwoWire> Rtc(Wire);
 bool rtcBatteryIsLive = true;
