@@ -8,14 +8,14 @@ class Screen {
     Screen();
     ~Screen();
 
-    void initiate();
-    void clearBuffer();
-    void sendBuffer();
-    void printTemperature(int currentTemperature, int currentHumidity);
-    void printDayStrip(int currentHour, int lightDayStart, int lightDayEnd);
-    void printAppVersion();
-    void printTime(struct tm localtime);
-    void printHumidityWater(bool hasWater);
+    static void initiate();
+    static void clearBuffer();
+    static void sendBuffer();
+    static void printTemperature(int currentTemperature, int currentHumidity);
+    static void printDayStrip(int currentHour, int lightDayStart, int lightDayEnd);
+    static void printAppVersion();
+    static void printTime(struct tm localtime);
+    static void printHumidityWater(bool hasWater);
 };
 
 #endif /* Screen_h */

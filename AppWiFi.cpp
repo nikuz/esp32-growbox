@@ -22,11 +22,19 @@ void AppWiFi::initiate() {
     // Configure static IP and Google DNS
     WiFi.config(ip, gateway, subnet, dns1, dns2);
     // Connect to provided SSID and PSWD
-    WiFi.begin(SSID, PSWD);
+    // WiFi.begin(SSID, PSWD);
 }
 
 bool AppWiFi::isConnected() {
     return WiFi.isConnected();
+}
+
+const char* AppWiFi::getSSID() {
+    return SSID;
+}
+
+const char* AppWiFi::getPSWD() {
+    return PSWD;
 }
 
 void AppWiFi::reConnect() {
@@ -36,7 +44,7 @@ void AppWiFi::reConnect() {
     Serial.println("Connecting to " + String(SSID));
     const int maxReconnectAttempts = 5;
     int reconnectAttemptIndex = 0;
-    while (!this->isConnected() && reconnectAttemptIndex < maxReconnectAttempts) {
+    while (!AppWiFi::isConnected() && reconnectAttemptIndex < maxReconnectAttempts) {
         Serial.print(".");  // Keep the serial monitor lit!
         delay(500);
         if (wifiReconnectTime < millis()) {
@@ -47,7 +55,7 @@ void AppWiFi::reConnect() {
         }
     }
 
-    if (this->isConnected()) {
+    if (AppWiFi::isConnected()) {
         // Connection Succeed
         Serial.println("");
         Serial.print("IP address: ");
@@ -60,15 +68,15 @@ void AppWiFi::reConnect() {
 void AppWiFi::connect() {
     // Wait for connection to establish
     Serial.print("Check WiFi connection...");
-    if (!this->isConnected()) {
-        this->reConnect();
+    if (!AppWiFi::isConnected()) {
+        AppWiFi::reConnect();
     } else {
         WiFiClient client;
         const char* host = "google.com";
         if (!client.connect(host, 80)) {
             Serial.println("Google connection failed");
             client.stop();
-            this->reConnect();
+            AppWiFi::reConnect();
             return;
         }
 
@@ -82,7 +90,7 @@ void AppWiFi::connect() {
             if (millis() - timeout > 5000) {
                 Serial.println(">>> AppWiFi::connect Client Timeout !");
                 client.stop();
-                this->reConnect();
+                AppWiFi::reConnect();
                 return;
             }
         }

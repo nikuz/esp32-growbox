@@ -8,21 +8,21 @@ class AppTime {
     AppTime();
     ~AppTime();
 
-    void obtainSNTP();
-    bool localTime(struct tm* timeinfo);
+    static void obtainSNTP();
+    static bool localTime(struct tm* timeinfo);
 
-    void RTCBegin();
-    void RTCUpdateByNtp();
-    int RTCGetTemperature();
-    bool RTCBattery();
-    bool RTCIsDateTimeValid();
-    struct tm RTCGetCurrentTime();
+    static void RTCBegin();
+    static void RTCUpdateByNtp();
+    static int RTCGetTemperature();
+    static bool RTCBattery();
+    static bool RTCIsDateTimeValid();
+    static struct tm RTCGetCurrentTime();
 
-    struct tm getCurrentTime();
-    int getCurrentHour();
-    String getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
+    static struct tm getCurrentTime();
+    static int getCurrentHour();
+    static String getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
 
-    void print();
+    static void print();
 };
 
 #endif /* AppTime_h */

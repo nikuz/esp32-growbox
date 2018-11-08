@@ -2,9 +2,6 @@
 
 #include "def.h"
 #include "Relay.h"
-#include "Blynk.h"
-
-static Blynk blynkClient;
 
 Relay::Relay() {}
 Relay::~Relay() {}
@@ -21,8 +18,8 @@ void Relay::initiate() {
 // ventilation
 bool ventilationEnabled = false;
 bool ventilationProphylaxisEnabled = false;
-const int ventilationProphylaxisInterval = 60 * 10;  // enable ventilation Prophylaxis every 10 minutes
-unsigned long ventilationEnableLastTime = 0;
+const int ventilationProphylaxisInterval = 60L * 10L;  // enable ventilation Prophylaxis every 10 minutes
+unsigned long ventilationEnableLastTime = 0L;
 
 bool Relay::isVentilationOn() {
     return ventilationEnabled;
@@ -36,7 +33,7 @@ void Relay::ventilationOn() {
     if (!ventilationEnabled) {
         digitalWrite(RELAY_2, HIGH);
         ventilationEnabled = true;
-        blynkClient.terminal("Ventilation ON.");
+        Serial.println("Ventilation ON.");
     }
 }
 
@@ -45,7 +42,7 @@ void Relay::ventilationOff() {
         digitalWrite(RELAY_2, LOW);
         ventilationEnabled = false;
         ventilationEnableLastTime = millis();
-        blynkClient.terminal("Ventilation OFF.");
+        Serial.println("Ventilation OFF.");
     }
 }
 
@@ -54,10 +51,10 @@ void Relay::ventilationProphylaxis() {
     const unsigned long now = millis();
     if (now > interval && now - interval > ventilationEnableLastTime && !ventilationEnabled) {
         ventilationProphylaxisEnabled = true;
-        this->ventilationOn();
+        Relay::ventilationOn();
     } else if (ventilationProphylaxisEnabled) {
         ventilationProphylaxisEnabled = false;
-        this->ventilationOff();
+        Relay::ventilationOff();
     }
 }
 
@@ -70,6 +67,7 @@ bool Relay::isLightOn() {
 
 void Relay::lightOn() {
     if (!lightEnabled) {
+    	Serial.println("Light ON.");
         digitalWrite(RELAY_1, HIGH);
         lightEnabled = true;
     }
@@ -77,6 +75,7 @@ void Relay::lightOn() {
 
 void Relay::lightOff() {
     if (lightEnabled) {
+    	Serial.println("Light OFF.");
         digitalWrite(RELAY_1, LOW);
         lightEnabled = false;
     }
@@ -93,7 +92,7 @@ void Relay::humidityOn() {
     if (!humidityEnabled) {
         digitalWrite(RELAY_3, HIGH);
         humidityEnabled = true;
-        blynkClient.terminal("Humidity ON.");
+        Serial.println("Humidity ON.");
     }
 }
 
@@ -101,6 +100,6 @@ void Relay::humidityOff() {
     if (humidityEnabled) {
         digitalWrite(RELAY_3, LOW);
         humidityEnabled = false;
-        blynkClient.terminal("Humidity OFF.");
+        Serial.println("Humidity OFF.");
     }
 }

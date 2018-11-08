@@ -1,9 +1,9 @@
 #define PRODUCTION 1    // production
-// #define PRODUCTION 0    // development
+//#define PRODUCTION 0    // development
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
-#define VERSION 41
+#define VERSION 43
 
 #if PRODUCTION
 #define VERSION_MARKER "P"
@@ -12,7 +12,11 @@
 #endif
 
 // sensors
+#if PRODUCTION
 #define DHTTYPE DHT22
+#else
+#define DHTTYPE DHT11
+#endif
 #define DHTPin  18
 #define HUMIDITY_WATER_SENSOR 13
 

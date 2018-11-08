@@ -8,22 +8,19 @@ class Sensor {
     Sensor();
     ~Sensor();
 
-    void initiate();
+    static void initiate();
+    static void readDHT();
     
-    void temperatureRead();
-    float temperatureGet();
-    bool temperatureMoreThan(int maxValue);
-    bool temperatureLessThan(int minValue);
+    static float temperatureGet();
+    static bool temperatureMoreThan(int maxValue);
+    static bool temperatureLessThan(int minValue);
     
-    void humidityRead();
-    float humidityGet();
-    bool humidityMoreThan(int maxValue);
-    bool humidityLessThan(int minValue);
+    static float humidityGet();
+    static bool humidityMoreThan(int maxValue);
+    static bool humidityLessThan(int minValue);
 
-    void readDHT();
-
-    bool humidityHasWater();
-    unsigned int getSoilMoisture(int sensorId, int min, int max);
+    static bool humidityHasWater();
+    static unsigned int getSoilMoisture(int sensorId, int min, int max);
 };
 
 #endif /* Sensor_h */

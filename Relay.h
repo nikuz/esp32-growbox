@@ -8,24 +8,24 @@ class Relay {
     Relay();
     ~Relay();
 
-    void initiate();
+    static void initiate();
 
     // ventilation
-    bool isVentilationOn();
-    bool isVentilationProphylaxisOn();
-    void ventilationOn();
-    void ventilationOff();
-    void ventilationProphylaxis();
+    static bool isVentilationOn();
+    static bool isVentilationProphylaxisOn();
+    static void ventilationOn();
+    static void ventilationOff();
+    static void ventilationProphylaxis();
 
     // light
-    bool isLightOn();
-    void lightOn();
-    void lightOff();
+    static bool isLightOn();
+    static void lightOn();
+    static void lightOff();
 
     // humidity
-    bool isHumidityOn();
-    void humidityOn();
-    void humidityOff();
+    static bool isHumidityOn();
+    static void humidityOn();
+    static void humidityOff();
 };
 
 #endif /* Relay_h */

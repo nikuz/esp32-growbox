@@ -6,10 +6,7 @@
 #include "def.h"
 #include "AppTime.h"
 #include "AppWiFi.h"
-#include "Blynk.h"
-
-static AppWiFi appWiFiClient;
-static Blynk blynkClient;
+#include "AppBlynk.h"
 
 const char* ntpServer = "1.rs.pool.ntp.org";
 const char* ntpServer2 = "0.europe.pool.ntp.org";
@@ -39,22 +36,22 @@ void AppTime::RTCUpdateByNtp() {
     RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
     if (!Rtc.IsDateTimeValid()) {
         Rtc.SetDateTime(compiled);
-        blynkClient.terminal("RTC lost confidence in the DateTime!");
+        Serial.println("RTC lost confidence in the DateTime!");
     }
     if (!Rtc.GetIsRunning()) {
         Rtc.SetIsRunning(true);
-        blynkClient.terminal("RTC was not actively running, starting now");
+        Serial.println("RTC was not actively running, starting now");
     }
     RtcDateTime now = Rtc.GetDateTime();
     if (now < compiled) {
         Rtc.SetDateTime(compiled);
-        blynkClient.terminal("RTC is older than compile time!  (Updating DateTime)");
+        Serial.println("RTC is older than compile time!  (Updating DateTime)");
     }
 
     // Oct 10 2018
     // 00:06:21
     struct tm timeinfo = {0};
-    if (this->localTime(&timeinfo)) {
+    if (AppTime::localTime(&timeinfo)) {
         static const char mon_name[][4] = {
             "Jan", "Feb", "Mar", "Apr", "May", "Jun",
             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -118,15 +115,15 @@ struct tm AppTime::RTCGetCurrentTime() {
 
 struct tm AppTime::getCurrentTime() {
     struct tm timeinfo = {0};
-    if (!appWiFiClient.isConnected() || !this->localTime(&timeinfo)) {
-        if (this->RTCIsDateTimeValid()) {
-            timeinfo = this->RTCGetCurrentTime();
+    if (!AppWiFi::isConnected() || !AppTime::localTime(&timeinfo)) {
+        if (AppTime::RTCIsDateTimeValid()) {
+            timeinfo = AppTime::RTCGetCurrentTime();
         } else {
-            // this->RTCBegin();
-            // this->RTCUpdateByNtp();
+            // AppTime::RTCBegin();
+            // AppTime::RTCUpdateByNtp();
         }
     }
-    if (!this->RTCIsDateTimeValid()) {
+    if (!AppTime::RTCIsDateTimeValid()) {
         rtcBatteryIsLive = false;
     } else {
         rtcBatteryIsLive = true;
@@ -136,7 +133,7 @@ struct tm AppTime::getCurrentTime() {
 }
 
 int AppTime::getCurrentHour() {
-    struct tm currentTime = this->getCurrentTime();
+    struct tm currentTime = AppTime::getCurrentTime();
     return currentTime.tm_hour;
 }
 
@@ -157,7 +154,7 @@ String AppTime::getTimeString(struct tm timeStruct, char format[]) {
 }
 
 void AppTime::print() {
-    blynkClient.terminal("ntpTime: " + this->getTimeString(this->getCurrentTime()));
-    blynkClient.terminal("rtcTime: " + this->getTimeString(this->RTCGetCurrentTime()));
+    AppBlynk::terminal("ntpTime: " + AppTime::getTimeString(AppTime::getCurrentTime()));
+    AppBlynk::terminal("rtcTime: " + AppTime::getTimeString(AppTime::RTCGetCurrentTime()));
 }
 

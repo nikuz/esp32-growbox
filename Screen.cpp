@@ -7,9 +7,6 @@
 #include "Tools.h"
 #include "def.h"
 
-static AppTime appTime;
-static Tools tools;
-
 #if PRODUCTION
 U8G2_SH1106_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 16, 17, U8X8_PIN_NONE);
 #else
@@ -74,7 +71,7 @@ void Screen::printDayStrip(int currentHour, int lightDayStart, int lightDayEnd) 
         int boxHeight = i == currentHour ? 14 : 10;
         int margin = i == currentHour ? 2 : 0;
         u8g2_uint_t row = (i * boxWidth) + (i * gapWidth);
-        if (tools.lightDayDiapasonMatch(i, lightDayStart, lightDayEnd)) {
+        if (Tools::lightDayDiapasonMatch(i, lightDayStart, lightDayEnd)) {
             u8g2.drawBox(row, line - margin, boxWidth, boxHeight);
         } else {
             u8g2.drawFrame(row, line - margin, boxWidth, boxHeight);
@@ -100,7 +97,7 @@ void Screen::printTime(struct tm localtime) {
 
     u8g2.setFont(u8g2_font_6x10_tn);
     u8g2.setCursor(0, displayHeight);
-    u8g2.print(appTime.getTimeString(localtime, "%02u/%02u/%04u %02u:%02u"));
+    u8g2.print(AppTime::getTimeString(localtime, "%02u/%02u/%04u %02u:%02u"));
 }
 
 void Screen::printHumidityWater(bool hasWater) {

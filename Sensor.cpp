@@ -3,9 +3,6 @@
 
 #include "def.h"
 #include "Sensor.h"
-#include "Blynk.h"
-
-static Blynk blynkClient;
 
 static DHT dht(DHTPin, DHTTYPE);
 
@@ -20,28 +17,30 @@ void Sensor::initiate() {
     pinMode(HUMIDITY_WATER_SENSOR, INPUT);
 }
 
-// temperature
-
-void Sensor::temperatureRead() {
+void Sensor::readDHT() {
     float newTemperature = dht.readTemperature();
-    if (isnan(newTemperature)) {
-        blynkClient.terminal("Failed to read from DHT sensor!");
-    } else if (currentTemperature != newTemperature) {
-        currentTemperature = newTemperature;
-    }
+    float newHumidity = dht.readHumidity();
+	if (isnan(newTemperature) || isnan(newHumidity)) {
+		Serial.println("Failed to read from DHT sensor!");
+	} else {
+		currentTemperature = newTemperature;
+		currentHumidity = newHumidity;
+	}
 }
+
+// temperature
 
 float Sensor::temperatureGet() {
     return currentTemperature;
 }
 
 bool Sensor::temperatureMoreThan(int maxValue) {
-    float newTemperature = this->temperatureGet();
+    float newTemperature = Sensor::temperatureGet();
     return newTemperature > maxValue;
 }
 
 bool Sensor::temperatureLessThan(int maxValue) {
-    float newTemperature = this->temperatureGet();
+    float newTemperature = Sensor::temperatureGet();
     return newTemperature <= maxValue;
 }
 
@@ -51,28 +50,14 @@ float Sensor::humidityGet() {
     return currentHumidity;
 }
 
-void Sensor::humidityRead() {
-    float newHumidity = dht.readHumidity();
-    if (isnan(newHumidity)) {
-        blynkClient.terminal("Failed to read from DHT sensor!");
-    } else if (currentHumidity != newHumidity) {
-        currentHumidity = newHumidity;
-    }
-}
-
 bool Sensor::humidityMoreThan(int minValue) {
-    float newHumidity = this->humidityGet();
+    float newHumidity = Sensor::humidityGet();
     return newHumidity > minValue;
 }
 
 bool Sensor::humidityLessThan(int minValue) {
-    float newHumidity = this->humidityGet();
+    float newHumidity = Sensor::humidityGet();
     return newHumidity <= minValue;
-}
-
-void Sensor::readDHT() {
-    this->temperatureRead();
-    this->humidityRead();
 }
 
 bool Sensor::humidityHasWater() {

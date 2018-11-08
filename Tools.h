@@ -8,9 +8,9 @@ class Tools {
     Tools();
     ~Tools();
 
-    bool lightDayDiapasonMatch(int hour, int lightDayStart, int lightDayEnd);
-    String getUptime();
-    String getHeaderValue(String header, String headerName);
+    static bool lightDayDiapasonMatch(int hour, int lightDayStart, int lightDayEnd);
+    static String getUptime();
+    static String getHeaderValue(String header, String headerName);
 };
 
 #endif /* Tools_h */

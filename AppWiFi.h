@@ -8,12 +8,14 @@ class AppWiFi {
     AppWiFi();
     ~AppWiFi();
 
-    void initiate();
-    bool isConnected();
-    void connect();
+    static void initiate();
+    static const char* getSSID();
+    static const char* getPSWD();
+    static bool isConnected();
+    static void connect();
 
    private:
-    void reConnect();
+    static void reConnect();
 };
 
 #endif /* AppWiFi_h */
