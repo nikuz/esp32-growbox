@@ -4,22 +4,31 @@
 #include <Arduino.h>
 
 class AppTime {
-   public:
+public:
     AppTime();
+
     ~AppTime();
 
     static void obtainSNTP();
-    static bool localTime(struct tm* timeinfo);
+
+    static bool localTime(struct tm *timeinfo);
 
     static void RTCBegin();
+
     static void RTCUpdateByNtp();
+
     static int RTCGetTemperature();
+
     static bool RTCBattery();
+
     static bool RTCIsDateTimeValid();
+
     static struct tm RTCGetCurrentTime();
 
     static struct tm getCurrentTime();
+
     static int getCurrentHour();
+
     static String getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
 
     static void print();

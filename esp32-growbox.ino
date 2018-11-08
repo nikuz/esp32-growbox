@@ -11,7 +11,7 @@
 #include "Relay.h"
 #include "AppBlynk.h"
 
-static const char* TAG = "growbox";
+static const char *TAG = "growbox";
 
 // OTA settings
 String otaHost = "selfproduct.com";
@@ -51,7 +51,7 @@ void wifiConnect() {
     AppWiFi::connect();
 }
 
-void otaUpdateHandler() { 
+void otaUpdateHandler() {
     if (otaUpdate._host != otaHost || otaUpdate._bin != otaBin) {
         otaUpdate.updateEntries(otaHost, otaPort, otaBin);
     }
@@ -70,10 +70,7 @@ void screenRefresh() {
 
 void sensorsRead() {
     Sensor::readDHT();
-    if (
-        Sensor::temperatureMoreThan(ventTempMax)
-        || Sensor::humidityMoreThan(ventHumMax + 10)
-    ) {
+    if (Sensor::temperatureMoreThan(ventTempMax) || Sensor::humidityMoreThan(ventHumMax + 10)) {
         Relay::ventilationOn();
     } else if (
         !Relay::isVentilationProphylaxisOn()
@@ -95,7 +92,7 @@ void ventilationProphylaxis() {
 }
 
 void hourCheck() {
-	if (Tools::lightDayDiapasonMatch(AppTime::getCurrentHour(), lightDayStart, lightDayEnd)) {
+    if (Tools::lightDayDiapasonMatch(AppTime::getCurrentHour(), lightDayStart, lightDayEnd)) {
         Relay::lightOn();
     } else {
         Relay::lightOff();
@@ -117,10 +114,10 @@ void setup() {
     AppStorage::setVariable(&lightDayEnd, "lightDayEnd");
     AppStorage::setVariable(&ventTempMax, "ventTempMax");
     AppStorage::setVariable(&ventHumMax, "ventHumMax");
-    #if PRODUCTION
+#if PRODUCTION
     AppStorage::setVariable(&otaHost, "otaHost");
     AppStorage::setVariable(&otaBin, "otaBin");
-    #endif
+#endif
     AppStorage::restore();
 
     // intiate modules
@@ -135,7 +132,7 @@ void setup() {
     // attach timers
     wifiCheckConnectionTimer.attach(wifiCheckConnectionInterval, wifiConnect);
     //
- 	sensorsRead();
+    sensorsRead();
     sensorsReadTimer.attach(sensorsReadInterval, sensorsRead);
     //
     screenRefresh();
@@ -150,18 +147,18 @@ void setup() {
     otaCheckUpdateTimer.attach(otaCheckUpdateInterval, otaUpdateHandler);
     //
     // register Blynk variables
-	AppBlynk::setVariable(&lightDayStart, "lightDayStart");
-	AppBlynk::setVariable(&lightDayEnd, "lightDayEnd");
-	AppBlynk::setVariable(&ventTempMax, "ventTempMax");
-	AppBlynk::setVariable(&ventHumMax, "ventHumMax");
-	#if PRODUCTION
-	AppBlynk::setVariable(&otaHost, "otaHost");
-	AppBlynk::setVariable(&otaBin, "otaBin");
-	#endif
+    AppBlynk::setVariable(&lightDayStart, "lightDayStart");
+    AppBlynk::setVariable(&lightDayEnd, "lightDayEnd");
+    AppBlynk::setVariable(&ventTempMax, "ventTempMax");
+    AppBlynk::setVariable(&ventHumMax, "ventHumMax");
+#if PRODUCTION
+    AppBlynk::setVariable(&otaHost, "otaHost");
+    AppBlynk::setVariable(&otaBin, "otaBin");
+#endif
 
-//    AppBlynk::initiate();
+    AppBlynk::initiate();
 }
 
 void loop() {
-//    AppBlynk::run();
+    AppBlynk::run();
 }

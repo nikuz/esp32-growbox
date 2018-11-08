@@ -4,6 +4,7 @@
 #include "Relay.h"
 
 Relay::Relay() {}
+
 Relay::~Relay() {}
 
 void Relay::initiate() {
@@ -67,7 +68,7 @@ bool Relay::isLightOn() {
 
 void Relay::lightOn() {
     if (!lightEnabled) {
-    	Serial.println("Light ON.");
+        Serial.println("Light ON.");
         digitalWrite(RELAY_1, HIGH);
         lightEnabled = true;
     }
@@ -75,7 +76,7 @@ void Relay::lightOn() {
 
 void Relay::lightOff() {
     if (lightEnabled) {
-    	Serial.println("Light OFF.");
+        Serial.println("Light OFF.");
         digitalWrite(RELAY_1, LOW);
         lightEnabled = false;
     }

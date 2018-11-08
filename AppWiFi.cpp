@@ -6,14 +6,15 @@
 #include "AppWiFiDef.h"
 
 AppWiFi::AppWiFi() {}
+
 AppWiFi::~AppWiFi() {}
 
 void AppWiFi::initiate() {
-    #if PRODUCTION
+#if PRODUCTION
     IPAddress ip(192, 168, 1, 100);
-    #else
+#else
     IPAddress ip(192, 168, 1, 101);
-    #endif
+#endif
     IPAddress gateway(192, 168, 1, 1);
     IPAddress subnet(255, 255, 255, 0);
     IPAddress dns1(8, 8, 8, 8);  // google DNS
@@ -29,11 +30,11 @@ bool AppWiFi::isConnected() {
     return WiFi.isConnected();
 }
 
-const char* AppWiFi::getSSID() {
+const char *AppWiFi::getSSID() {
     return SSID;
 }
 
-const char* AppWiFi::getPSWD() {
+const char *AppWiFi::getPSWD() {
     return PSWD;
 }
 
@@ -72,7 +73,7 @@ void AppWiFi::connect() {
         AppWiFi::reConnect();
     } else {
         WiFiClient client;
-        const char* host = "google.com";
+        const char *host = "google.com";
         if (!client.connect(host, 80)) {
             Serial.println("Google connection failed");
             client.stop();
@@ -82,8 +83,8 @@ void AppWiFi::connect() {
 
         // This will send the request to the server
         client.print(String("GET ") + "/ HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
-                 "Connection: close\r\n\r\n");
+                     "Host: " + host + "\r\n" +
+                     "Connection: close\r\n\r\n");
 
         unsigned long timeout = millis();
         while (client.available() == 0) {

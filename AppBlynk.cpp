@@ -3,6 +3,7 @@
 #include <EspOta.h>
 
 #define BLYNK_PRINT Serial
+
 #include <BlynkSimpleEsp32.h>
 
 #include "def.h"
@@ -73,6 +74,7 @@ static BlynkIntVariable intVariables[10];
 static BlynkStringVariable stringVariables[10];
 
 AppBlynk::AppBlynk() {};
+
 AppBlynk::~AppBlynk() {};
 
 // private
@@ -102,7 +104,7 @@ int AppBlynk::getPinById(String pinId) {
     return -1;
 }
 
-int& AppBlynk::getIntCacheValue(String pinId) {
+int &AppBlynk::getIntCacheValue(String pinId) {
     if (pinId == "temperature") return temperatureCache;
     if (pinId == "humidity") return humidityCache;
     if (pinId == "light") return lightCache;
@@ -123,7 +125,7 @@ int& AppBlynk::getIntCacheValue(String pinId) {
     return fishIntCache;
 }
 
-String& AppBlynk::getStringCacheValue(String pinId) {
+String &AppBlynk::getStringCacheValue(String pinId) {
     if (pinId == "otaHost") return otaHostCache;
     if (pinId == "otaBin") return otaBinCache;
     if (pinId == "otaLastUpdateTime") return otaLastUpdateTimeCache;
@@ -132,7 +134,7 @@ String& AppBlynk::getStringCacheValue(String pinId) {
     return fishStringCache;
 }
 
-int& AppBlynk::getIntVariable(const char* pin) {
+int &AppBlynk::getIntVariable(const char *pin) {
     const int intVarsLen = *(&intVariables + 1) - intVariables;
     for (int i = 0; i < intVarsLen; i++) {
         if (intVariables[i].pin == pin) {
@@ -143,7 +145,7 @@ int& AppBlynk::getIntVariable(const char* pin) {
     return fishIntCache;
 }
 
-String& AppBlynk::getStringVariable(const char* pin) {
+String &AppBlynk::getStringVariable(const char *pin) {
     const int stringVarsLen = *(&stringVariables + 1) - stringVariables;
     for (int i = 0; i < stringVarsLen; i++) {
         if (intVariables[i].pin == pin) {
@@ -174,73 +176,73 @@ void syncHighFreq() { // every 2 sec
     AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX));
 
     bool humidityHasWater = Sensor::humidityHasWater();
-	#if PRODUCTION
-	if (!humidityHasWater && !noHumidityWaterNotificationSent) {
-		Blynk.notify("Humidity has no water");
-		noHumidityWaterNotificationSent = true;
-	} else if (humidityHasWater && noHumidityWaterNotificationSent) {
-		noHumidityWaterNotificationSent = false;
-	}
-	#endif
+#if PRODUCTION
+    if (!humidityHasWater && !noHumidityWaterNotificationSent) {
+        Blynk.notify("Humidity has no water");
+        noHumidityWaterNotificationSent = true;
+    } else if (humidityHasWater && noHumidityWaterNotificationSent) {
+        noHumidityWaterNotificationSent = false;
+    }
+#endif
 }
 
 BLYNK_WRITE(V6) { // lightDayStart
-	const char* pin = "lightDayStart";
+    const char* pin = "lightDayStart";
     int& variable = AppBlynk::getIntVariable(pin);
     AppBlynk::getData(variable, pin, param.asInt(), true);
 }
 BLYNK_WRITE(V7) { // lightDayEnd
-	const char* pin = "lightDayEnd";
+    const char* pin = "lightDayEnd";
     int& variable = AppBlynk::getIntVariable(pin);
     AppBlynk::getData(variable, pin, param.asInt(), true);
 }
 BLYNK_WRITE(V8) { // ventTempMax
-	const char* pin = "ventTempMax";
+    const char* pin = "ventTempMax";
     int& variable = AppBlynk::getIntVariable(pin);
     AppBlynk::getData(variable, pin, param.asInt(), true);
 }
 BLYNK_WRITE(V14) { // ventHumMax
-	const char* pin = "ventHumMax";
+    const char* pin = "ventHumMax";
     int& variable = AppBlynk::getIntVariable(pin);
     AppBlynk::getData(variable, pin, param.asInt(), true);
 }
 BLYNK_WRITE(V20) { // otaHost
-	const char* pin = "otaHost";
+    const char* pin = "otaHost";
     String& variable = AppBlynk::getStringVariable(pin);
     AppBlynk::getData(variable, pin, param.asStr(), true);
 }
 BLYNK_WRITE(V21) { // otaBin
-	const char* pin = "otaBin";
+    const char* pin = "otaBin";
     String& variable = AppBlynk::getStringVariable(pin);
     AppBlynk::getData(variable, pin, param.asStr(), true);
 }
 BLYNK_WRITE(V10) { // ping
-	if (param.asInt() == 1) {
-		Blynk.notify("PONG");
-		Blynk.virtualWrite(V10, 0);
-	}
+    if (param.asInt() == 1) {
+        Blynk.notify("PONG");
+        Blynk.virtualWrite(V10, 0);
+    }
 }
 BLYNK_WRITE(V13) { // get time
-	if (param.asInt() == 1) {
-		AppTime::print();
-		Blynk.virtualWrite(V13, 0);
-	}
+    if (param.asInt() == 1) {
+        AppTime::print();
+        Blynk.virtualWrite(V13, 0);
+    }
 }
 BLYNK_WRITE(V31) { // restart
-	if (param.asInt() == 1) {
-		Blynk.virtualWrite(V31, 0);
-		delay(2000);
-		ESP.restart();
-	}
+    if (param.asInt() == 1) {
+        Blynk.virtualWrite(V31, 0);
+        delay(2000);
+        ESP.restart();
+    }
 }
 
 BLYNK_CONNECTED() {
-  Blynk.syncAll();
+    Blynk.syncAll();
 }
 
 // public
 
-void AppBlynk::setVariable(int* var, const char* pin, bool store) {
+void AppBlynk::setVariable(int *var, const char *pin, bool store) {
     int urlCounts = *(&intVariables + 1) - intVariables;
     for (int i = 0; i < urlCounts; i++) {
         if (!intVariables[i].pin) {
@@ -250,7 +252,7 @@ void AppBlynk::setVariable(int* var, const char* pin, bool store) {
     }
 }
 
-void AppBlynk::setVariable(String* var, const char* pin, bool store) {
+void AppBlynk::setVariable(String *var, const char *pin, bool store) {
     int urlCounts = *(&stringVariables + 1) - stringVariables;
     for (int i = 0; i < urlCounts; i++) {
         if (!stringVariables[i].pin) {
@@ -274,7 +276,7 @@ void AppBlynk::run() {
     blynkSyncHighFreqTimer.run();
 }
 
-void AppBlynk::getData(int& localVariable, const char* pinId, int pinData, const bool storePreferences) {
+void AppBlynk::getData(int &localVariable, const char *pinId, int pinData, const bool storePreferences) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (localVariable == -1 || blynkPin == -1) {
         return;
@@ -287,7 +289,7 @@ void AppBlynk::getData(int& localVariable, const char* pinId, int pinData, const
     }
 }
 
-void AppBlynk::getData(String& localVariable, const char* pinId, String pinData, bool storePreferences) {
+void AppBlynk::getData(String &localVariable, const char *pinId, String pinData, bool storePreferences) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (localVariable == "fish" || blynkPin == -1) {
         return;
@@ -305,7 +307,7 @@ void AppBlynk::postData(String pinId, int value) {
     if (blynkPin == -1) {
         return;
     }
-    int& cacheValue = AppBlynk::getIntCacheValue(pinId);
+    int &cacheValue = AppBlynk::getIntCacheValue(pinId);
     if (cacheValue != -1 || cacheValue != value) { // post data also if cache not applied for pin
         Blynk.virtualWrite(blynkPin, value);
         cacheValue = value;
@@ -317,7 +319,7 @@ void AppBlynk::postData(String pinId, String value) {
     if (blynkPin == -1) {
         return;
     }
-    String& cacheValue = AppBlynk::getStringCacheValue(pinId);
+    String &cacheValue = AppBlynk::getStringCacheValue(pinId);
     if (cacheValue != "fish" || cacheValue != value) { // post data also if cache not applied for pin
         Blynk.virtualWrite(blynkPin, value);
         cacheValue = value;
@@ -325,7 +327,7 @@ void AppBlynk::postData(String pinId, String value) {
 }
 
 void AppBlynk::terminal(String value) {
-	Serial.print(value);
-	blynkTerminal.println(value);
-	blynkTerminal.flush();
+    Serial.print(value);
+    blynkTerminal.println(value);
+    blynkTerminal.flush();
 }

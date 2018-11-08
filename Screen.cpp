@@ -14,6 +14,7 @@ U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 16, 17, U8X8_PIN_NONE);
 #endif
 
 Screen::Screen() {}
+
 Screen::~Screen() {}
 
 void Screen::initiate() {
@@ -21,7 +22,7 @@ void Screen::initiate() {
     u8g2.enableUTF8Print();
     u8g2.clearDisplay();
     u8g2.setFont(u8g2_font_crox2cb_tr);
-    
+
     const char loadingStr[] = "...";
     const u8g2_uint_t displayWidth = u8g2.getDisplayWidth();
     const u8g2_uint_t displayHeight = u8g2.getDisplayHeight();
@@ -36,6 +37,7 @@ void Screen::initiate() {
 void Screen::clearBuffer() {
     u8g2.clearBuffer();
 }
+
 void Screen::sendBuffer() {
     u8g2.sendBuffer();
 }

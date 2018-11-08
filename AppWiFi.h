@@ -4,17 +4,22 @@
 #include <Arduino.h>
 
 class AppWiFi {
-   public:
+public:
     AppWiFi();
+
     ~AppWiFi();
 
     static void initiate();
-    static const char* getSSID();
-    static const char* getPSWD();
+
+    static const char *getSSID();
+
+    static const char *getPSWD();
+
     static bool isConnected();
+
     static void connect();
 
-   private:
+private:
     static void reConnect();
 };
 

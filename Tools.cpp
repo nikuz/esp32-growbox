@@ -3,6 +3,7 @@
 #include "Tools.h"
 
 Tools::Tools() {}
+
 Tools::~Tools() {}
 
 bool Tools::lightDayDiapasonMatch(int hour, int lightDayStart, int lightDayEnd) {
@@ -20,6 +21,6 @@ String Tools::getUptime() {
 }
 
 // Utility to extract header value from headers
-String Tools::getHeaderValue(String header, String headerName) { 
-    return header.substring(strlen(headerName.c_str())); 
+String Tools::getHeaderValue(String header, String headerName) {
+    return header.substring(strlen(headerName.c_str()));
 }

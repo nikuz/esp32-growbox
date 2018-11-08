@@ -10,6 +10,7 @@ float currentTemperature = 0;
 float currentHumidity = 0;
 
 Sensor::Sensor() {}
+
 Sensor::~Sensor() {}
 
 void Sensor::initiate() {
@@ -20,12 +21,12 @@ void Sensor::initiate() {
 void Sensor::readDHT() {
     float newTemperature = dht.readTemperature();
     float newHumidity = dht.readHumidity();
-	if (isnan(newTemperature) || isnan(newHumidity)) {
-		Serial.println("Failed to read from DHT sensor!");
-	} else {
-		currentTemperature = newTemperature;
-		currentHumidity = newHumidity;
-	}
+    if (isnan(newTemperature) || isnan(newHumidity)) {
+        Serial.println("Failed to read from DHT sensor!");
+    } else {
+        currentTemperature = newTemperature;
+        currentHumidity = newHumidity;
+    }
 }
 
 // temperature
@@ -67,7 +68,7 @@ bool Sensor::humidityHasWater() {
 
 unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
     int value = analogRead(sensorId);
-    
+
     if (value) {
         value = map(value, min, max, 0, 100);
         if (value < 0) {
