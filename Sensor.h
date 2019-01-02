@@ -9,9 +9,7 @@ public:
 
     ~Sensor();
 
-    static void initiate();
-
-    static void readDHT();
+    static void parseSerialCommand(const char *command, const char *param);
 
     static float temperatureGet();
 
@@ -27,7 +25,7 @@ public:
 
     static bool humidityHasWater();
 
-    static unsigned int getSoilMoisture(int sensorId, int min, int max);
+    static unsigned int getSoilMoisture(int id, int min, int max);
 };
 
 #endif /* Sensor_h */

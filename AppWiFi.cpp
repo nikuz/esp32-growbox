@@ -9,7 +9,7 @@ AppWiFi::AppWiFi() {}
 
 AppWiFi::~AppWiFi() {}
 
-void AppWiFi::initiate() {
+void AppWiFi::connect() {
 #if PRODUCTION
     IPAddress ip(192, 168, 1, 100);
 #else
@@ -23,7 +23,27 @@ void AppWiFi::initiate() {
     // Configure static IP and Google DNS
     WiFi.config(ip, gateway, subnet, dns1, dns2);
     // Connect to provided SSID and PSWD
-    // WiFi.begin(SSID, PSWD);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(SSID, PSWD);
+
+    for (int loops = 10; loops > 0; loops--) {
+        if (WiFi.isConnected()) {
+            Serial.println("");
+            Serial.print("IP address: ");
+            Serial.println(WiFi.localIP());
+            Serial.print("DNS address: ");
+            Serial.println(WiFi.dnsIP());
+            break;
+        } else {
+            Serial.println(loops);
+            delay(1000);
+        }
+    }
+    if (!WiFi.isConnected()) {
+        Serial.println("WiFi connect failed");
+        delay(1000);
+        ESP.restart();
+    }
 }
 
 bool AppWiFi::isConnected() {
@@ -36,67 +56,4 @@ const char *AppWiFi::getSSID() {
 
 const char *AppWiFi::getPSWD() {
     return PSWD;
-}
-
-void AppWiFi::reConnect() {
-    unsigned long wifiReconnectInterval = 1000L * 5L;
-    unsigned long wifiReconnectTime = millis() + wifiReconnectInterval;
-    Serial.println("");
-    Serial.println("Connecting to " + String(SSID));
-    const int maxReconnectAttempts = 5;
-    int reconnectAttemptIndex = 0;
-    while (!AppWiFi::isConnected() && reconnectAttemptIndex < maxReconnectAttempts) {
-        Serial.print(".");  // Keep the serial monitor lit!
-        delay(500);
-        if (wifiReconnectTime < millis()) {
-            Serial.println("Wifi need to reconnect");
-            reconnectAttemptIndex += 1;
-            WiFi.reconnect();
-            wifiReconnectTime = millis() + wifiReconnectInterval;
-        }
-    }
-
-    if (AppWiFi::isConnected()) {
-        // Connection Succeed
-        Serial.println("");
-        Serial.print("IP address: ");
-        Serial.println(WiFi.localIP());
-        Serial.print("DNS address: ");
-        Serial.println(WiFi.dnsIP());
-    }
-}
-
-void AppWiFi::connect() {
-    // Wait for connection to establish
-    Serial.print("Check WiFi connection...");
-    if (!AppWiFi::isConnected()) {
-        AppWiFi::reConnect();
-    } else {
-        WiFiClient client;
-        const char *host = "google.com";
-        if (!client.connect(host, 80)) {
-            Serial.println("Google connection failed");
-            client.stop();
-            AppWiFi::reConnect();
-            return;
-        }
-
-        // This will send the request to the server
-        client.print(String("GET ") + "/ HTTP/1.1\r\n" +
-                     "Host: " + host + "\r\n" +
-                     "Connection: close\r\n\r\n");
-
-        unsigned long timeout = millis();
-        while (client.available() == 0) {
-            if (millis() - timeout > 5000) {
-                Serial.println(">>> AppWiFi::connect Client Timeout !");
-                client.stop();
-                AppWiFi::reConnect();
-                return;
-            }
-        }
-        client.stop();
-
-        Serial.println(" Already connected");
-    }
 }

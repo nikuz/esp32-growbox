@@ -9,7 +9,7 @@ public:
 
     ~Relay();
 
-    static void initiate();
+    static void parseSerialCommand(const char *command, const char *param);
 
     // ventilation
     static bool isVentilationOn();

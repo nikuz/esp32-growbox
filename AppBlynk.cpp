@@ -62,10 +62,15 @@ String otaBinCache = "";
 String otaLastUpdateTimeCache = "";
 String uptimeCache = "";
 
-const int blynkSyncInterval = 1000l * 60L;  // sync blynk low frew state every 60 seconds
+const int blynkConnectAttemptTime = 1000l * 5L;  // try to connect to blynk server only 5 seconds
+BlynkTimer checkConnectTimer;
+const int checkConnectInterval = 1000l * 30L;  // check blynk connection every 30 seconds
+const int blynkSyncInterval = 1000l * 60L;  // sync blynk low freq state every 60 seconds
 BlynkTimer blynkSyncTimer;
+int blynkSyncTimerVar;
 const int blynkSyncHighFreqInterval = 1000l * 2L;  // sync blynk high freq state every 2 seconds
 BlynkTimer blynkSyncHighFreqTimer;
+int blynkSyncHighFreqTimerVar;
 WidgetTerminal blynkTerminal(V30);
 
 bool noHumidityWaterNotificationSent = false;
@@ -148,7 +153,7 @@ int &AppBlynk::getIntVariable(const char *pin) {
 String &AppBlynk::getStringVariable(const char *pin) {
     const int stringVarsLen = *(&stringVariables + 1) - stringVariables;
     for (int i = 0; i < stringVarsLen; i++) {
-        if (intVariables[i].pin == pin) {
+        if (stringVariables[i].pin == pin) {
             return *stringVariables[i].var;
         }
     }
@@ -157,7 +162,14 @@ String &AppBlynk::getStringVariable(const char *pin) {
 }
 
 void sync() { // every 60 sec
+	const char* otaHostPin = "otaHost";
+	String& otaHostVariable = AppBlynk::getStringVariable(otaHostPin);
+    AppBlynk::postData("otaHost", otaHostVariable);
+    const char* otaBinPin = "otaBin";
+    String& otaBinVariable = AppBlynk::getStringVariable(otaBinPin);
+	AppBlynk::postData("otaBin", otaBinVariable);
     AppBlynk::postData("otaLastUpdateTime", EspOta::getUpdateTime());
+
     AppBlynk::postData("uptime", Tools::getUptime());
     AppBlynk::postData("version", VERSION_MARKER + String(VERSION));
 }
@@ -175,8 +187,8 @@ void syncHighFreq() { // every 2 sec
     AppBlynk::postData("soilMoisture3", Sensor::getSoilMoisture(SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX));
     AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX));
 
-    bool humidityHasWater = Sensor::humidityHasWater();
 #if PRODUCTION
+    bool humidityHasWater = Sensor::humidityHasWater();
     if (!humidityHasWater && !noHumidityWaterNotificationSent) {
         Blynk.notify("Humidity has no water");
         noHumidityWaterNotificationSent = true;
@@ -240,11 +252,47 @@ BLYNK_CONNECTED() {
     Blynk.syncAll();
 }
 
+void deleteTimer(BlynkTimer timer, int &timerVar) {
+	if (timer.isEnabled(timerVar)) {
+		timer.disable(timerVar);
+		timer.deleteTimer(timerVar);
+	}
+}
+
+void checkConnect() {
+	bool blynkWasNotConnected = false;
+	if (!Blynk.connected()) {
+		deleteTimer(blynkSyncTimer, blynkSyncTimerVar);
+		deleteTimer(blynkSyncHighFreqTimer, blynkSyncHighFreqTimerVar);
+	}
+
+	if (AppWiFi::isConnected() && !Blynk.connected()) {
+		unsigned long startConnecting = millis();
+		while (!Blynk.connected()) {
+			Blynk.connect();
+			if (millis() > startConnecting + blynkConnectAttemptTime) {
+				Serial.println("Unable to connect to Blynk server.\n");
+				break;
+			}
+		}
+		if (Blynk.connected()) {
+			blynkWasNotConnected = true;
+		}
+	}
+
+	if (blynkWasNotConnected && Blynk.connected()) {
+		blynkTerminal.clear();
+		sync();
+		blynkSyncTimerVar = blynkSyncTimer.setInterval(blynkSyncInterval, sync);
+		blynkSyncHighFreqTimerVar = blynkSyncHighFreqTimer.setInterval(blynkSyncHighFreqInterval, syncHighFreq);
+	}
+}
+
 // public
 
 void AppBlynk::setVariable(int *var, const char *pin, bool store) {
-    int urlCounts = *(&intVariables + 1) - intVariables;
-    for (int i = 0; i < urlCounts; i++) {
+    int varsCount = *(&intVariables + 1) - intVariables;
+    for (int i = 0; i < varsCount; i++) {
         if (!intVariables[i].pin) {
             intVariables[i] = BlynkIntVariable(var, pin, store);
             break;
@@ -253,8 +301,8 @@ void AppBlynk::setVariable(int *var, const char *pin, bool store) {
 }
 
 void AppBlynk::setVariable(String *var, const char *pin, bool store) {
-    int urlCounts = *(&stringVariables + 1) - stringVariables;
-    for (int i = 0; i < urlCounts; i++) {
+    int varsCount = *(&stringVariables + 1) - stringVariables;
+    for (int i = 0; i < varsCount; i++) {
         if (!stringVariables[i].pin) {
             stringVariables[i] = BlynkStringVariable(var, pin, store);
             break;
@@ -263,17 +311,18 @@ void AppBlynk::setVariable(String *var, const char *pin, bool store) {
 }
 
 void AppBlynk::initiate() {
-    Blynk.begin(blynkAuth, AppWiFi::getSSID(), AppWiFi::getPSWD(), blynkDomain, blynkPort);
-    blynkTerminal.clear();
-    sync();
-    blynkSyncTimer.setInterval(blynkSyncInterval, sync);
-    blynkSyncHighFreqTimer.setInterval(blynkSyncHighFreqInterval, syncHighFreq);
+    Blynk.config(blynkAuth, blynkDomain, blynkPort);
+    checkConnect();
+    checkConnectTimer.setInterval(checkConnectInterval, checkConnect);
 }
 
 void AppBlynk::run() {
-    Blynk.run();
-    blynkSyncTimer.run();
-    blynkSyncHighFreqTimer.run();
+	if (Blynk.connected()) {
+		Blynk.run();
+		blynkSyncTimer.run();
+		blynkSyncHighFreqTimer.run();
+	}
+	checkConnectTimer.run();
 }
 
 void AppBlynk::getData(int &localVariable, const char *pinId, int pinData, const bool storePreferences) {

@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
-#include <RtcDS3231.h>
 
 #include "Screen.h"
 #include "AppTime.h"
@@ -8,9 +7,9 @@
 #include "def.h"
 
 #if PRODUCTION
-U8G2_SH1106_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 16, 17, U8X8_PIN_NONE);
+U8G2_SH1106_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 21, 22, U8X8_PIN_NONE);
 #else
-U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 16, 17, U8X8_PIN_NONE);
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 21, 22, U8X8_PIN_NONE);
 #endif
 
 Screen::Screen() {}
@@ -64,6 +63,9 @@ void Screen::printTemperature(int temperature, int humidity) {
 }
 
 void Screen::printDayStrip(int currentHour, int lightDayStart, int lightDayEnd) {
+    if (currentHour == -1) {
+        return;
+    }
     const int line = 22;
     const u8g2_uint_t displayWidth = u8g2.getDisplayWidth();
     const u8g2_uint_t gapWidth = 1;

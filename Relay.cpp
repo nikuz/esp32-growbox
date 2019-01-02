@@ -2,25 +2,59 @@
 
 #include "def.h"
 #include "Relay.h"
+#include "AppSerial.h"
 
-Relay::Relay() {}
+const char relayOnSerialCommand[] = "rOn";
+const char relayOffSerialCommand[] = "rOf";
 
-Relay::~Relay() {}
-
-void Relay::initiate() {
-    pinMode(RELAY_1, OUTPUT);
-    digitalWrite(RELAY_1, LOW);
-    pinMode(RELAY_2, OUTPUT);
-    digitalWrite(RELAY_2, LOW);
-    pinMode(RELAY_3, OUTPUT);
-    digitalWrite(RELAY_3, LOW);
-}
+// light
+bool lightEnabled = false;
 
 // ventilation
 bool ventilationEnabled = false;
 bool ventilationProphylaxisEnabled = false;
 const int ventilationProphylaxisInterval = 60L * 10L;  // enable ventilation Prophylaxis every 10 minutes
 unsigned long ventilationEnableLastTime = 0L;
+
+// humidity
+bool humidityEnabled = false;
+
+Relay::Relay() {}
+
+Relay::~Relay() {}
+
+void Relay::parseSerialCommand(const char *command, const char *param) {
+    if (strcmp(command, "rOn") == 0) {
+        if (strcmp(param, "light") == 0) {
+            lightEnabled = true;
+            Serial.println("Light ON.");
+        }
+        if (strcmp(param, "vent") == 0) {
+            ventilationEnabled = true;
+            Serial.println("Ventilation ON.");
+        }
+        if (strcmp(param, "humidity") == 0) {
+            humidityEnabled = true;
+            Serial.println("Humidity ON.");
+        }
+    } else if (strcmp(command, "rOf") == 0) {
+        if (strcmp(param, "light") == 0) {
+            lightEnabled = false;
+            Serial.println("Light OFF.");
+        }
+        if (strcmp(param, "vent") == 0) {
+            ventilationEnabled = false;
+            Serial.println("Ventilation OFF.");
+            ventilationEnableLastTime = millis();
+        }
+        if (strcmp(param, "humidity") == 0) {
+            humidityEnabled = false;
+            Serial.println("Humidity OFF.");
+        }
+    }
+}
+
+// ventilation
 
 bool Relay::isVentilationOn() {
     return ventilationEnabled;
@@ -31,20 +65,13 @@ bool Relay::isVentilationProphylaxisOn() {
 }
 
 void Relay::ventilationOn() {
-    if (!ventilationEnabled) {
-        digitalWrite(RELAY_2, HIGH);
-        ventilationEnabled = true;
-        Serial.println("Ventilation ON.");
-    }
+	SerialFrame ventilationFrame = SerialFrame(relayOnSerialCommand, "vent");
+	AppSerial::sendFrame(&ventilationFrame);
 }
 
 void Relay::ventilationOff() {
-    if (ventilationEnabled) {
-        digitalWrite(RELAY_2, LOW);
-        ventilationEnabled = false;
-        ventilationEnableLastTime = millis();
-        Serial.println("Ventilation OFF.");
-    }
+	SerialFrame ventilationFrame = SerialFrame(relayOffSerialCommand, "vent");
+	AppSerial::sendFrame(&ventilationFrame);
 }
 
 void Relay::ventilationProphylaxis() {
@@ -60,47 +87,33 @@ void Relay::ventilationProphylaxis() {
 }
 
 // light
-bool lightEnabled = false;
 
 bool Relay::isLightOn() {
     return lightEnabled;
 }
 
 void Relay::lightOn() {
-    if (!lightEnabled) {
-        Serial.println("Light ON.");
-        digitalWrite(RELAY_1, HIGH);
-        lightEnabled = true;
-    }
+	SerialFrame lightFrame = SerialFrame(relayOnSerialCommand, "light");
+	AppSerial::sendFrame(&lightFrame);
 }
 
 void Relay::lightOff() {
-    if (lightEnabled) {
-        Serial.println("Light OFF.");
-        digitalWrite(RELAY_1, LOW);
-        lightEnabled = false;
-    }
+	SerialFrame lightFrame = SerialFrame(relayOffSerialCommand, "light");
+	AppSerial::sendFrame(&lightFrame);
 }
 
 // humidity
-bool humidityEnabled = false;
 
 bool Relay::isHumidityOn() {
     return humidityEnabled;
 }
 
 void Relay::humidityOn() {
-    if (!humidityEnabled) {
-        digitalWrite(RELAY_3, HIGH);
-        humidityEnabled = true;
-        Serial.println("Humidity ON.");
-    }
+	SerialFrame humidityFrame = SerialFrame(relayOnSerialCommand, "humidity");
+	AppSerial::sendFrame(&humidityFrame);
 }
 
 void Relay::humidityOff() {
-    if (humidityEnabled) {
-        digitalWrite(RELAY_3, LOW);
-        humidityEnabled = false;
-        Serial.println("Humidity OFF.");
-    }
+	SerialFrame humidityFrame = SerialFrame(relayOffSerialCommand, "humidity");
+	AppSerial::sendFrame(&humidityFrame);
 }

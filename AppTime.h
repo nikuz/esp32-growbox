@@ -11,6 +11,8 @@ public:
 
     static void obtainSNTP();
 
+    static void parseSerialCommand(const char *command, const char *param);
+
     static bool localTime(struct tm *timeinfo);
 
     static void RTCBegin();
@@ -21,15 +23,13 @@ public:
 
     static bool RTCBattery();
 
-    static bool RTCIsDateTimeValid();
-
     static struct tm RTCGetCurrentTime();
 
     static struct tm getCurrentTime();
 
     static int getCurrentHour();
 
-    static String getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
+    static char *getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
 
     static void print();
 };

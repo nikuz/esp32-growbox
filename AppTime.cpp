@@ -1,12 +1,11 @@
 #include <Arduino.h>
 #include <Time.h>
-#include <RtcDS3231.h>
-#include <Wire.h>
 
 #include "def.h"
 #include "AppTime.h"
 #include "AppWiFi.h"
 #include "AppBlynk.h"
+#include "Tools.h"
 
 const char *ntpServer = "1.rs.pool.ntp.org";
 const char *ntpServer2 = "0.europe.pool.ntp.org";
@@ -14,120 +13,139 @@ const char *ntpServer3 = "1.europe.pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 0;
 
-RtcDS3231 <TwoWire> Rtc(Wire);
-bool rtcBatteryIsLive = true;
+struct tm RTCCurrentTime = {
+        tm_sec: -1,
+        tm_min: -1,
+        tm_hour: -1,
+        tm_mday: -1,
+        tm_mon: -1,
+        tm_year: -1,
+        tm_wday: -1,
+        tm_yday: -1,
+        tm_isdst: -1
+};
+int rtcTemperature = 0;
+bool rtcBatteryAlive = true;
+
+static const char mon_name[][4] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
 
 AppTime::AppTime() {}
 
 AppTime::~AppTime() {}
 
 void AppTime::obtainSNTP() {
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, ntpServer2, ntpServer3);
+    if (AppWiFi::isConnected()) {
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, ntpServer2, ntpServer3);
+    }
+}
+
+void AppTime::parseSerialCommand(const char *command, const char *param) {
+    // 10/10/2018 00:09:21
+    if (strcmp(command, "time") == 0) {
+        uint8_t month = -1;
+        uint8_t day = -1;
+        uint8_t year = -1;
+        uint8_t hours = -1;
+        uint8_t minutes = -1;
+        uint8_t seconds = -1;
+
+        char *string, *found;
+        string = strdup(param);
+
+        int i = 0;
+        while((found = strsep(&string, " ")) != NULL) {
+            char *substring, *subfound;
+            substring = strdup(found);
+            if (i == 0) {
+                int dateI = 0;
+                while((subfound = strsep(&substring, "/")) != NULL) {
+                    int value = Tools::StringToUint8(subfound);
+                    switch (dateI) {
+                        case 0:
+                            month = value;
+                            break;
+                        case 1:
+                            day = value;
+                            break;
+                        case 2:
+                            year = Tools::StringToUint8(subfound + 2);
+                            break;
+                    }
+                    dateI++;
+                }
+            } else {
+                int timeI = 0;
+                while((subfound = strsep(&substring, ":")) != NULL) {
+                    int value = Tools::StringToUint8(subfound);
+                    switch (timeI) {
+                        case 0:
+                            hours = value;
+                            break;
+                        case 1:
+                            minutes = value;
+                            break;
+                        case 2:
+                            seconds = value;
+                            break;
+                    }
+                    timeI++;
+                }
+            }
+            free(substring);
+            i++;
+        }
+        free(string);
+
+        RTCCurrentTime = {
+                tm_sec: seconds,
+                tm_min: minutes,
+                tm_hour: hours,
+                tm_mday: day,
+                tm_mon: month - 1, // 0 based
+                tm_year: 2000 + year - 1900,
+                tm_wday: 0,
+                tm_yday: 0,
+                tm_isdst: 0
+        };
+    }
+    if (strcmp(command, "ttemp") == 0) {
+        int value = Tools::StringToUint8(param);
+        rtcTemperature = value;
+    }
+    if (strcmp(command, "tbtr") == 0) {
+        int value = Tools::StringToUint8(param);
+        rtcBatteryAlive = value == 1;
+    }
 }
 
 bool AppTime::localTime(struct tm *timeinfo) {
     return getLocalTime(timeinfo);
 }
 
-void AppTime::RTCBegin() {
-    Rtc.Begin();
-}
-
-void AppTime::RTCUpdateByNtp() {
-    RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
-    if (!Rtc.IsDateTimeValid()) {
-        Rtc.SetDateTime(compiled);
-        Serial.println("RTC lost confidence in the DateTime!");
-    }
-    if (!Rtc.GetIsRunning()) {
-        Rtc.SetIsRunning(true);
-        Serial.println("RTC was not actively running, starting now");
-    }
-    RtcDateTime now = Rtc.GetDateTime();
-    if (now < compiled) {
-        Rtc.SetDateTime(compiled);
-        Serial.println("RTC is older than compile time!  (Updating DateTime)");
-    }
-
-    // Oct 10 2018
-    // 00:06:21
-    struct tm timeinfo = {0};
-    if (AppTime::localTime(&timeinfo)) {
-        static const char mon_name[][4] = {
-                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-        };
-        static char ntpDate[15];
-        sprintf(
-                ntpDate,
-                "%.3s%3d %d",
-                mon_name[timeinfo.tm_mon],
-                timeinfo.tm_mday,
-                timeinfo.tm_year + 1900
-        );
-        static char ntpTime[15];
-        sprintf(
-                ntpTime,
-                "%02u:%02u:%02u",
-                timeinfo.tm_hour,
-                timeinfo.tm_min,
-                timeinfo.tm_sec
-        );
-
-        RtcDateTime ntpDateTime = RtcDateTime(ntpDate, ntpTime);
-        Rtc.SetDateTime(ntpDateTime);
-    }
-
-    // never assume the Rtc was last configured by you, so
-    // just clear them to your needed state
-    Rtc.Enable32kHzPin(false);
-    Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeNone);
-}
-
 int AppTime::RTCGetTemperature() {
-    RtcTemperature rtcTemp = Rtc.GetTemperature();
-    return (int) rtcTemp.AsFloatDegC();
+    return rtcTemperature;
 }
 
 bool AppTime::RTCBattery() {
-    return rtcBatteryIsLive;
-}
-
-bool AppTime::RTCIsDateTimeValid() {
-    return Rtc.IsDateTimeValid();
+    return rtcBatteryAlive;
 }
 
 struct tm AppTime::RTCGetCurrentTime() {
-    RtcDateTime rtcTime = Rtc.GetDateTime();
-    struct tm timeinfo = {
-            tm_sec: rtcTime.Second(),
-            tm_min: rtcTime.Minute(),
-            tm_hour: rtcTime.Hour(),
-            tm_mday: rtcTime.Day(),
-            tm_mon: rtcTime.Month() - 1,      // 0-based
-            tm_year: rtcTime.Year() - 1900,
-            tm_wday: 0,
-            tm_yday: 0,
-            tm_isdst: 0
-    };
-
-    return timeinfo;
+    return RTCCurrentTime;
 }
 
 struct tm AppTime::getCurrentTime() {
     struct tm timeinfo = {0};
     if (!AppWiFi::isConnected() || !AppTime::localTime(&timeinfo)) {
-        if (AppTime::RTCIsDateTimeValid()) {
-            timeinfo = AppTime::RTCGetCurrentTime();
+        if (AppTime::RTCBattery()) {
+            timeinfo = RTCCurrentTime;
         } else {
             // AppTime::RTCBegin();
             // AppTime::RTCUpdateByNtp();
         }
-    }
-    if (!AppTime::RTCIsDateTimeValid()) {
-        rtcBatteryIsLive = false;
-    } else {
-        rtcBatteryIsLive = true;
     }
 
     return timeinfo;
@@ -138,11 +156,11 @@ int AppTime::getCurrentHour() {
     return currentTime.tm_hour;
 }
 
-String AppTime::getTimeString(struct tm timeStruct, char format[]) {
-    char timeString[20];
+char *AppTime::getTimeString(struct tm timeStruct, char format[]) {
+    static char timeString[20];
     snprintf_P(
             timeString,
-            countof(timeString),
+            sizeof timeString,
             PSTR(format),
             timeStruct.tm_mon + 1,
             timeStruct.tm_mday,
@@ -155,7 +173,15 @@ String AppTime::getTimeString(struct tm timeStruct, char format[]) {
 }
 
 void AppTime::print() {
-    AppBlynk::terminal("ntpTime: " + AppTime::getTimeString(AppTime::getCurrentTime()));
-    AppBlynk::terminal("rtcTime: " + AppTime::getTimeString(AppTime::RTCGetCurrentTime()));
+    struct tm timeinfo = {0};
+    AppTime::localTime(&timeinfo);
+
+    char *ntpTime[] = {"ntpTime: ", AppTime::getTimeString(timeinfo)};
+    char *ntpTimeStr = Tools::getCharArray(ntpTime, 2);
+    AppBlynk::terminal(ntpTimeStr);
+
+    char *rtcTime[] = {"rtcTime: ", AppTime::getTimeString(RTCCurrentTime)};
+    char *rtcTimeStr = Tools::getCharArray(rtcTime, 2);
+    AppBlynk::terminal(rtcTimeStr);
 }
 

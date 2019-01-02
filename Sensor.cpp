@@ -1,31 +1,51 @@
 #include <Arduino.h>
-#include <DHT.h>
 
 #include "def.h"
 #include "Sensor.h"
-
-static DHT dht(DHTPin, DHTTYPE);
+#include "Tools.h"
 
 float currentTemperature = 0;
 float currentHumidity = 0;
+bool humidityWater = false;
+bool wateringWater = false;
+unsigned int soilMoisture[4] = {
+        0,
+        0,
+        0,
+        0,
+};
 
 Sensor::Sensor() {}
 
 Sensor::~Sensor() {}
 
-void Sensor::initiate() {
-    dht.begin();
-    pinMode(HUMIDITY_WATER_SENSOR, INPUT);
-}
-
-void Sensor::readDHT() {
-    float newTemperature = dht.readTemperature();
-    float newHumidity = dht.readHumidity();
-    if (isnan(newTemperature) || isnan(newHumidity)) {
-        Serial.println("Failed to read from DHT sensor!");
-    } else {
-        currentTemperature = newTemperature;
-        currentHumidity = newHumidity;
+void Sensor::parseSerialCommand(const char *command, const char *param) {
+    int value = Tools::StringToUint8(param);
+    if (strcmp(command, "temp") == 0) {
+        currentTemperature = value;
+    }
+    if (strcmp(command, "hum") == 0) {
+        currentHumidity = value;
+    }
+    if (strcmp(command, "humw") == 0) {
+        int hasWater = value;
+        humidityWater = hasWater == 1;
+    }
+    if (strcmp(command, "water") == 0) {
+        int hasWater = value;
+        humidityWater = hasWater == 1;
+    }
+    if (strcmp(command, "s1") == 0) {
+        soilMoisture[0] = value;
+    }
+    if (strcmp(command, "s2") == 0) {
+        soilMoisture[1] = value;
+    }
+    if (strcmp(command, "s3") == 0) {
+        soilMoisture[2] = value;
+    }
+    if (strcmp(command, "s4") == 0) {
+        soilMoisture[3] = value;
     }
 }
 
@@ -62,12 +82,11 @@ bool Sensor::humidityLessThan(int minValue) {
 }
 
 bool Sensor::humidityHasWater() {
-    int hasWater = digitalRead(HUMIDITY_WATER_SENSOR);
-    return hasWater ? true : false;
+    return humidityHasWater;
 }
 
 unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
-    int value = analogRead(sensorId);
+    int value = soilMoisture[sensorId - 1];
 
     if (value) {
         value = map(value, min, max, 0, 100);
