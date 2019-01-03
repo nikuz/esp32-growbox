@@ -8,7 +8,14 @@ float currentTemperature = 0;
 float currentHumidity = 0;
 bool humidityWater = false;
 bool wateringWater = false;
+bool doorOpened = false;
 unsigned int soilMoisture[4] = {
+        0,
+        0,
+        0,
+        0,
+};
+unsigned int rainSensors[4] = {
         0,
         0,
         0,
@@ -44,6 +51,21 @@ void Sensor::parseSerialCommand(const char *command, const char *param) {
     }
     if (strcmp(command, "s4") == 0) {
         soilMoisture[3] = value;
+    }
+    if (strcmp(command, "rain1") == 0) {
+        rainSensors[0] = value;
+    }
+    if (strcmp(command, "rain2") == 0) {
+        rainSensors[1] = value;
+    }
+    if (strcmp(command, "rain3") == 0) {
+        rainSensors[2] = value;
+    }
+    if (strcmp(command, "rain4") == 0) {
+        rainSensors[3] = value;
+    }
+    if (strcmp(command, "door") == 0) {
+        doorOpened = value == 0;
     }
 }
 
@@ -105,4 +127,19 @@ unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
 
 bool Sensor::wateringHasWater() {
     return wateringWater;
+}
+
+bool Sensor::waterLeakageDetected() {
+    const int rainSensorsLen = *(&rainSensors + 1) - rainSensors;
+    for (int i = 0; i < rainSensorsLen; i++) {
+        if (rainSensors[i] == 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Sensor::doorIsOpen() {
+    return doorOpened;
 }

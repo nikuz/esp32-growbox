@@ -15,11 +15,13 @@
 #include "Sensor.h"
 #include "Relay.h"
 #include "AppTime.h"
+#include "Light.h"
 
 // Blynk virtual pins
 const int pinTemperature = V0;
 const int pinHumidity = V1;
 const int pinLight = V2;
+const int pinLightIntensity = V25;
 const int pinLightDayStart = V6;
 const int pinLightDayEnd = V7;
 const int pinVentilation = V3;
@@ -40,12 +42,17 @@ const int pinSoilMoisture3 = V18;
 const int pinSoilMoisture4 = V19;
 const int pinWSoilMstrMin = V23;
 const int pinWatering = V24;
+const int pinWater = V28;
+const int pinLightMaxInt = V26;
+const int pinDoor = V27;
 
 // cache
 int fishIntCache = -1;
 int temperatureCache = 0;
 int humidityCache = 0;
 int lightCache = 0;
+int lightIntensityCache = 0;
+int lightMaxIntCache = 0;
 int lightDayStartCache = 0;
 int lightDayEndCache = 0;
 int ventilationCache = 0;
@@ -60,8 +67,10 @@ int soilMoistureCache1 = 0;
 int soilMoistureCache2 = 0;
 int soilMoistureCache3 = 0;
 int soilMoistureCache4 = 0;
-int pinWSoilMstrMinCache = 0;
-int pinWateringCache = 0;
+int wSoilMstrMinCache = 0;
+int wateringCache = 0;
+int waterCache = 0;
+int doorCache = 0;
 String fishStringCache = "fish";
 String otaHostCache = "";
 String otaBinCache = "";
@@ -80,6 +89,7 @@ int blynkSyncHighFreqTimerVar;
 WidgetTerminal blynkTerminal(V30);
 
 bool noHumidityWaterNotificationSent = false;
+bool noWaterNotificationSent = false;
 
 static BlynkIntVariable intVariables[10];
 static BlynkStringVariable stringVariables[10];
@@ -94,6 +104,8 @@ int AppBlynk::getPinById(String pinId) {
     if (pinId == "temperature") return pinTemperature;
     if (pinId == "humidity") return pinHumidity;
     if (pinId == "light") return pinLight;
+    if (pinId == "lightIntensity") return pinLightIntensity;
+    if (pinId == "lightMaxInt") return pinLightMaxInt;
     if (pinId == "lightDayStart") return pinLightDayStart;
     if (pinId == "lightDayEnd") return pinLightDayEnd;
     if (pinId == "ventilation") return pinVentilation;
@@ -113,7 +125,9 @@ int AppBlynk::getPinById(String pinId) {
     if (pinId == "soilMoisture3") return pinSoilMoisture3;
     if (pinId == "soilMoisture4") return pinSoilMoisture4;
     if (pinId == "wSoilMstrMin") return pinWSoilMstrMin;
+    if (pinId == "water") return pinWater;
     if (pinId == "watering") return pinWatering;
+    if (pinId == "door") return pinDoor;
 
     return -1;
 }
@@ -122,6 +136,7 @@ int &AppBlynk::getIntCacheValue(String pinId) {
     if (pinId == "temperature") return temperatureCache;
     if (pinId == "humidity") return humidityCache;
     if (pinId == "light") return lightCache;
+    if (pinId == "lightIntensity") return lightIntensityCache;
     if (pinId == "lightDayStart") return lightDayStartCache;
     if (pinId == "lightDayEnd") return lightDayEndCache;
     if (pinId == "ventilation") return ventilationCache;
@@ -136,8 +151,10 @@ int &AppBlynk::getIntCacheValue(String pinId) {
     if (pinId == "soilMoisture2") return soilMoistureCache2;
     if (pinId == "soilMoisture3") return soilMoistureCache3;
     if (pinId == "soilMoisture4") return soilMoistureCache4;
-    if (pinId == "wSoilMstrMin") return pinWSoilMstrMinCache;
-    if (pinId == "watering") return pinWateringCache;
+    if (pinId == "wSoilMstrMin") return wSoilMstrMinCache;
+    if (pinId == "watering") return wateringCache;
+    if (pinId == "water") return waterCache;
+    if (pinId == "door") return doorCache;
 
     return fishIntCache;
 }
@@ -200,6 +217,9 @@ void syncHighFreq() { // every 2 sec
     AppBlynk::postData("soilMoisture3", Sensor::getSoilMoisture(SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX));
     AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX));
     AppBlynk::postData("watering", Relay::isWateringOn() ? 255 : 0);
+    AppBlynk::postData("water", Sensor::wateringHasWater() ? 255 : 0);
+    AppBlynk::postData("lightIntensity", Light::intensity());
+    AppBlynk::postData("door", Sensor::doorIsOpen() ? 0 : 255);
 
 #if PRODUCTION
     bool humidityHasWater = Sensor::humidityHasWater();
@@ -208,6 +228,14 @@ void syncHighFreq() { // every 2 sec
         noHumidityWaterNotificationSent = true;
     } else if (humidityHasWater && noHumidityWaterNotificationSent) {
         noHumidityWaterNotificationSent = false;
+    }
+
+    bool wateringHasWater = Sensor::wateringHasWater();
+    if (!wateringHasWater && !noWaterNotificationSent) {
+        Blynk.notify("Watering has no water");
+        noWaterNotificationSent = true;
+    } else if (wateringHasWater && noWaterNotificationSent) {
+        noWaterNotificationSent = false;
     }
 #endif
 }
@@ -244,6 +272,11 @@ BLYNK_WRITE(V21) { // otaBin
 }
 BLYNK_WRITE(V23) { // wSoilMstrMin
     const char* pin = "wSoilMstrMin";
+    int& variable = AppBlynk::getIntVariable(pin);
+    AppBlynk::getData(variable, pin, param.asInt(), true);
+}
+BLYNK_WRITE(V26) { // lightMaxInt
+    const char* pin = "lightMaxInt";
     int& variable = AppBlynk::getIntVariable(pin);
     AppBlynk::getData(variable, pin, param.asInt(), true);
 }

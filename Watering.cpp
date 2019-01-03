@@ -16,7 +16,8 @@ char wateringStartedFor[10];
 
 bool mainWateringStarted = false;
 unsigned long mainWateringStartedAt = 0;
-unsigned long mainWateringTime = 10L * 1000L;
+unsigned long mainWateringTime = 10L * 1000L;           // 10 sec
+unsigned long mainWateringTimeHumidity = 30L * 1000L;   // 30 sec
 bool mainWateringPassed = false;
 
 bool moistureRecheckPassed = false;
@@ -87,20 +88,28 @@ unsigned int getSoilMoisture(const char *sensorId) {
     return 0;
 }
 
+bool noWaterOrLeakageDetected() {
+    if (!Sensor::wateringHasWater()) {
+        Serial.println("No water. Watering terminated!!!");
+        stop();
+        return true;
+    }
+    if (Sensor::waterLeakageDetected()) {
+        Serial.println("Water leakage detected. Watering terminated!!!");
+        return true;
+    }
+
+    return false;
+}
+
 // stopping (8 stage)
 
 void stopping() {
     if (!wateringStarted) {
         return;
-    } else if (
-        wateringStarted
-        && mixingPassed
-        && valveIsOpen
-        && testWateringPassed
-        && waitingBeforeMoistureRecheckPassed
-        && moistureRecheckPassed
-        && mainWateringPassed
-    ) {
+    }
+
+    if (mainWateringPassed) {
         stop();
     }
 }
@@ -108,38 +117,28 @@ void stopping() {
 // main watering (7 stage)
 
 void mainWatering() {
-    if (
-        !wateringStarted
-        || !mixingPassed
-        || !valveIsOpen
-        || !testWateringPassed
-        || !waitingBeforeMoistureRecheckPassed
-        || !moistureRecheckPassed
-        || mainWateringPassed
-    ) {
+    if (!wateringStarted || !valveIsOpen || mainWateringPassed) {
         return;
     }
-    if (
-        wateringStarted
-        && mixingPassed
-        && valveIsOpen
-        && testWateringPassed
-        && waitingBeforeMoistureRecheckPassed
-        && moistureRecheckPassed
-        && !mainWateringStarted
-    ) {
+    const bool wateringForHumidity = strcmp(wateringStartedFor, "sHumidity") == 0;
+    if (!wateringForHumidity && !moistureRecheckPassed) {
+        return;
+    }
+    if (noWaterOrLeakageDetected()) {
+        stop();
+        return;
+    }
+    if (!mainWateringStarted) {
         Relay::wateringOn();
         mainWateringStarted = true;
         mainWateringStartedAt = millis();
         Serial.print("Start main watering for: ");
         Serial.print(mainWateringTime / 1000L);
         Serial.println("s");
+        return;
     }
-    if (!Sensor::wateringHasWater()) {
-        Serial.println("Stop main watering because no water");
-        stop();
-    }
-    if (millis() > mainWateringStartedAt + mainWateringTime) {
+    unsigned long wateringTime = wateringForHumidity ? mainWateringTimeHumidity : mainWateringTime;
+    if (millis() > mainWateringStartedAt + wateringTime) {
         Relay::wateringOff();
         Serial.println("Stop main watering");
         mainWateringStarted = false;
@@ -152,49 +151,46 @@ void mainWatering() {
 void moistureRecheck() {
     if (
         !wateringStarted
-        || !mixingPassed
-        || !valveIsOpen
-        || !testWateringPassed
         || !waitingBeforeMoistureRecheckPassed
+        || strcmp(wateringStartedFor, "sHumidity") == 0
         || moistureRecheckPassed
     ) {
         return;
     }
-    if (
-        wateringStarted
-        && mixingPassed
-        && valveIsOpen
-        && testWateringPassed
-        && waitingBeforeMoistureRecheckPassed
-    ) {
-        moistureRechecked = getSoilMoisture(wateringStartedFor);
-        if (moistureRechecked - moistureStarted > moistureDifferenceThreshold) {
-            moistureRecheckPassed = true;
-        } else {
-            Serial.println("Moisture recheck failed!!!");
-            Serial.print("Initial moisture: ");
-            Serial.println(moistureStarted);
-            Serial.print("Rechecked moisture: ");
-            Serial.println(moistureRechecked);
-            Serial.print("Difference is: ");
-            Serial.println(moistureRechecked - moistureStarted);
-            stop();
-        }
+
+    moistureRechecked = getSoilMoisture(wateringStartedFor);
+    if (moistureRechecked - moistureStarted > moistureDifferenceThreshold) {
+        moistureRecheckPassed = true;
+    } else {
+        Serial.println("Moisture recheck failed!!!");
+        Serial.print("Initial moisture: ");
+        Serial.println(moistureStarted);
+        Serial.print("Rechecked moisture: ");
+        Serial.println(moistureRechecked);
+        Serial.print("Difference is: ");
+        Serial.println(moistureRechecked - moistureStarted);
+        stop();
     }
 }
 
 // wait before moisture recheck (5 stage)
 
 void waitBeforeMoistureRecheck() {
-    if (!wateringStarted || !mixingPassed || !valveIsOpen || !testWateringPassed || waitingBeforeMoistureRecheckPassed) {
+    if (
+        !wateringStarted
+        || !testWateringPassed
+        || strcmp(wateringStartedFor, "sHumidity") == 0
+        || waitingBeforeMoistureRecheckPassed
+    ) {
         return;
     }
-    if (wateringStarted && mixingPassed && valveIsOpen && testWateringPassed && !waitingBeforeMoistureRecheckStarted) {
+    if (!waitingBeforeMoistureRecheckStarted) {
         waitingBeforeMoistureRecheckStarted = true;
         waitingBeforeMoistureRecheckStartedAt = millis();
         Serial.print("Start waiting before moisture recheck for: ");
         Serial.print(waitingBeforeMoistureRecheckTime / 1000L);
         Serial.println("s");
+        return;
     }
     if (millis() > waitingBeforeMoistureRecheckStartedAt + waitingBeforeMoistureRecheckTime) {
         Serial.println("Stop waiting before moisture recheck");
@@ -206,20 +202,26 @@ void waitBeforeMoistureRecheck() {
 // test watering (4 stage)
 
 void testWatering() {
-    if (!wateringStarted || !mixingPassed || !valveIsOpen || testWateringPassed) {
+    if (
+        !wateringStarted
+        || !valveIsOpen
+        || strcmp(wateringStartedFor, "sHumidity") == 0
+        || testWateringPassed
+    ) {
         return;
     }
-    if (wateringStarted && mixingPassed && valveIsOpen && !testWateringStarted) {
+    if (noWaterOrLeakageDetected()) {
+        stop();
+        return;
+    }
+    if (!testWateringStarted) {
         Relay::wateringOn();
         testWateringStarted = true;
         testWateringStartedAt = millis();
         Serial.print("Start test watering for: ");
         Serial.print(testWateringTime / 1000L);
         Serial.println("s");
-    }
-    if (!Sensor::wateringHasWater()) {
-        Serial.println("Stop test watering because no water!!!");
-        stop();
+        return;
     }
     if (millis() > testWateringStartedAt + testWateringTime) {
         Relay::wateringOff();
@@ -235,16 +237,17 @@ void valve() {
     if (!wateringStarted || !mixingPassed || valveIsOpen) {
         return;
     }
-    if (wateringStarted && mixingPassed && !valveIsOpen) {
-        Relay::wateringOpenValve(wateringStartedFor);
-        Serial.print("Try to open valve for: ");
-        Serial.println(wateringStartedFor);
-    }
+
     if (Relay::wateringValveIsOpen(wateringStartedFor)) {
         valveIsOpen = true;
         Serial.print("Valve was open for: ");
         Serial.println(wateringStartedFor);
+        return;
     }
+
+    Relay::wateringOpenValve(wateringStartedFor);
+    Serial.print("Try to open valve for: ");
+    Serial.println(wateringStartedFor);
 }
 
 // water mixing (2 stage)
@@ -253,17 +256,18 @@ void mixing() {
     if (!wateringStarted || mixingPassed) {
         return;
     }
-    if (wateringStarted && !mixingStarted) {
+    if (noWaterOrLeakageDetected()) {
+        stop();
+        return;
+    }
+    if (!mixingStarted) {
         Relay::wateringMixingOn();
         mixingStarted = true;
         mixingEnabledAt = millis();
         Serial.print("Start water mixing for: ");
         Serial.print(mixingTime / 1000L);
         Serial.println("s");
-    }
-    if (!Sensor::wateringHasWater()) {
-        Serial.println("Stop water mixing because no water!!!");
-        stop();
+        return;
     }
     if (millis() > mixingEnabledAt + mixingTime) {
         Relay::wateringMixingOff();
@@ -276,11 +280,7 @@ void mixing() {
 // soil moisture check (1 stage)
 
 void soilMoisture(int &wSoilMstrMin) {
-    if (wateringStarted) {
-        return;
-    }
-    if (!Sensor::wateringHasWater()) {
-        Serial.println("No water. Watering terminated!!!");
+    if (wateringStarted || noWaterOrLeakageDetected()) {
         return;
     }
     const char* firstPot = "s1";

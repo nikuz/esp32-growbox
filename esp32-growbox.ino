@@ -11,6 +11,7 @@
 #include "AppSerial.h"
 #include "AppBlynk.h"
 #include "Watering.h"
+#include "Light.h"
 
 static const char *TAG = "growbox";
 
@@ -45,8 +46,9 @@ unsigned long ventilationProphylaxisLastTime = 0;
 // light settings
 const int hourCheckInterval = 1;  // check current hour every second
 unsigned long hourCheckLastTime = 0;
-int lightDayStart = 0;  // 22:00 by default
-int lightDayEnd = 17;    // 15:00 by default
+int lightDayStart = 0;  // 00:00 by default
+int lightDayEnd = 17;   // 17:00 by default
+int lightMaxInt = 50;   // in percents
 
 void otaUpdateHandler() {
 	if (otaUpdate._host != otaHost || otaUpdate._bin != otaBin) {
@@ -95,6 +97,12 @@ void sensorsRead() {
         Relay::windOff();
     } else {
         Relay::windOn();
+    }
+
+    if (Sensor::doorIsOpen()) {
+        Relay::humidityOff();
+        Relay::windOn();
+        Relay::ventilationOff();
     }
 }
 
@@ -147,6 +155,7 @@ void setup() {
     AppStorage::setVariable(&otaHost, "otaHost");
     AppStorage::setVariable(&otaBin, "otaBin");
     AppStorage::setVariable(&wSoilMstrMin, "wSoilMstrMin");
+    AppStorage::setVariable(&lightMaxInt, "lightMaxInt");
     AppStorage::restore();
 
     // setup wifi ip address etc.
@@ -171,6 +180,7 @@ void setup() {
     AppBlynk::setVariable(&otaHost, "otaHost");
     AppBlynk::setVariable(&otaBin, "otaBin");
     AppBlynk::setVariable(&wSoilMstrMin, "wSoilMstrMin");
+    AppBlynk::setVariable(&lightMaxInt, "lightMaxInt");
 
     // start Blynk connection
     AppBlynk::initiate();
@@ -187,6 +197,7 @@ void loop() {
         AppTime::parseSerialCommand(serialFrame.command, serialFrame.param);
         Sensor::parseSerialCommand(serialFrame.command, serialFrame.param);
         Relay::parseSerialCommand(serialFrame.command, serialFrame.param);
+        Light::parseSerialCommand(serialFrame.command, serialFrame.param);
     }
 
     if (Tools::timerCheck(sensorsReadInterval, sensorsReadLastTime)) {
@@ -211,6 +222,7 @@ void loop() {
     }
 
     Watering::check(wSoilMstrMin);
+    Light::setIntensity(lightDayStart, lightDayEnd, lightMaxInt);
 
     AppBlynk::run();
 }

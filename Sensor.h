@@ -28,6 +28,10 @@ public:
     static unsigned int getSoilMoisture(int id, int min, int max);
 
     static bool wateringHasWater();
+
+    static bool waterLeakageDetected();
+
+    static bool doorIsOpen();
 };
 
 #endif /* Sensor_h */

@@ -29,6 +29,8 @@ public:
 
     static int getCurrentHour();
 
+    static int getCurrentMinute();
+
     static char *getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
 
     static void print();

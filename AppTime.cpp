@@ -156,6 +156,11 @@ int AppTime::getCurrentHour() {
     return currentTime.tm_hour;
 }
 
+int AppTime::getCurrentMinute() {
+    struct tm currentTime = AppTime::getCurrentTime();
+    return currentTime.tm_min;
+}
+
 char *AppTime::getTimeString(struct tm timeStruct, char format[]) {
     static char timeString[20];
     snprintf_P(
