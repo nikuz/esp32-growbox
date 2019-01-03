@@ -23,6 +23,14 @@ bool humidityEnabled = false;
 // wind
 bool windEnabled = false;
 
+// watering
+bool wateringEnabled = false;
+bool wateringOpenedValve1 = false;
+bool wateringOpenedValve2 = false;
+bool wateringOpenedValve3 = false;
+bool wateringOpenedValve4 = false;
+bool wateringOpenedValveHumidity = false;
+
 Relay::Relay() {}
 
 Relay::~Relay() {}
@@ -45,6 +53,34 @@ void Relay::parseSerialCommand(const char *command, const char *param) {
             windEnabled = true;
             Serial.println("Wind ON.");
         }
+        if (strcmp(param, "wmixing") == 0) {
+            wateringEnabled = true;
+            Serial.println("Water mixing ON.");
+        }
+        if (strcmp(param, "s1") == 0) {
+            wateringOpenedValve1 = true;
+            Serial.println("Open valve s1.");
+        }
+        if (strcmp(param, "s2") == 0) {
+            wateringOpenedValve2 = true;
+            Serial.println("Open valve s2.");
+        }
+        if (strcmp(param, "s3") == 0) {
+            wateringOpenedValve3 = true;
+            Serial.println("Open valve s3.");
+        }
+        if (strcmp(param, "s4") == 0) {
+            wateringOpenedValve4 = true;
+            Serial.println("Open valve s4.");
+        }
+        if (strcmp(param, "sHumidity") == 0) {
+            wateringOpenedValveHumidity = true;
+            Serial.println("Open valve sHumidity.");
+        }
+        if (strcmp(param, "water") == 0) {
+            wateringEnabled = true;
+            Serial.println("Watering ON.");
+        }
     } else if (strcmp(command, "rOf") == 0) {
         if (strcmp(param, "light") == 0) {
             lightEnabled = false;
@@ -62,6 +98,33 @@ void Relay::parseSerialCommand(const char *command, const char *param) {
         if (strcmp(param, "wind") == 0) {
             windEnabled = false;
             Serial.println("Wind OFF.");
+        }
+        if (strcmp(param, "s1") == 0) {
+            wateringOpenedValve1 = false;
+            Serial.println("Close valve s1.");
+        }
+        if (strcmp(param, "s2") == 0) {
+            wateringOpenedValve2 = false;
+            Serial.println("Close valve s2.");
+        }
+        if (strcmp(param, "s3") == 0) {
+            wateringOpenedValve3 = false;
+            Serial.println("Close valve s3.");
+        }
+        if (strcmp(param, "s4") == 0) {
+            wateringOpenedValve4 = false;
+            Serial.println("Close valve s4.");
+        }
+        if (strcmp(param, "sHumidity") == 0) {
+            wateringOpenedValveHumidity = false;
+            Serial.println("Close valve sHumidity.");
+        }
+        // do not need to indicate wateringEnabled as false when wmixing off,
+        // because watering process is complex, and going in cascade
+        // wateringEnabled will be off on water off, this event happen on any watering terminating event
+        if (strcmp(param, "water") == 0) {
+            wateringEnabled = false;
+            Serial.println("Watering OFF.");
         }
     }
 }
@@ -146,4 +209,60 @@ void Relay::windOn() {
 void Relay::windOff() {
     SerialFrame windFrame = SerialFrame(relayOffSerialCommand, "wind");
     AppSerial::sendFrame(&windFrame);
+}
+
+// watering
+
+bool Relay::isWateringOn() {
+    return wateringEnabled;
+}
+
+void Relay::wateringMixingOn() {
+    SerialFrame mixingFrame = SerialFrame(relayOnSerialCommand, "wmixing");
+    AppSerial::sendFrame(&mixingFrame);
+}
+
+void Relay::wateringMixingOff() {
+    SerialFrame mixingFrame = SerialFrame(relayOffSerialCommand, "wmixing");
+    AppSerial::sendFrame(&mixingFrame);
+}
+
+bool Relay::wateringValveIsOpen(char *valveId) {
+    if (strcmp(valveId, "s1") == 0) {
+        return wateringOpenedValve1;
+    }
+    if (strcmp(valveId, "s2") == 0) {
+        return wateringOpenedValve2;
+    }
+    if (strcmp(valveId, "s3") == 0) {
+        return wateringOpenedValve3;
+    }
+    if (strcmp(valveId, "s4") == 0) {
+        return wateringOpenedValve4;
+    }
+    if (strcmp(valveId, "sHumidity") == 0) {
+        return wateringOpenedValveHumidity;
+    }
+
+    return false;
+}
+
+void Relay::wateringOpenValve(char *valveId) {
+    SerialFrame openValveFrame = SerialFrame(relayOnSerialCommand, valveId);
+    AppSerial::sendFrame(&openValveFrame);
+}
+
+void Relay::wateringCloseValve(char *valveId) {
+    SerialFrame closeValveFrame = SerialFrame(relayOffSerialCommand, valveId);
+    AppSerial::sendFrame(&closeValveFrame);
+}
+
+void Relay::wateringOn() {
+    SerialFrame waterFrame = SerialFrame(relayOnSerialCommand, "water");
+    AppSerial::sendFrame(&waterFrame);
+}
+
+void Relay::wateringOff() {
+    SerialFrame waterFrame = SerialFrame(relayOffSerialCommand, "water");
+    AppSerial::sendFrame(&waterFrame);
 }

@@ -38,6 +38,8 @@ const int pinSoilMoisture1 = V16;
 const int pinSoilMoisture2 = V17;
 const int pinSoilMoisture3 = V18;
 const int pinSoilMoisture4 = V19;
+const int pinWSoilMstrMin = V23;
+const int pinWatering = V24;
 
 // cache
 int fishIntCache = -1;
@@ -58,6 +60,8 @@ int soilMoistureCache1 = 0;
 int soilMoistureCache2 = 0;
 int soilMoistureCache3 = 0;
 int soilMoistureCache4 = 0;
+int pinWSoilMstrMinCache = 0;
+int pinWateringCache = 0;
 String fishStringCache = "fish";
 String otaHostCache = "";
 String otaBinCache = "";
@@ -108,6 +112,8 @@ int AppBlynk::getPinById(String pinId) {
     if (pinId == "soilMoisture2") return pinSoilMoisture2;
     if (pinId == "soilMoisture3") return pinSoilMoisture3;
     if (pinId == "soilMoisture4") return pinSoilMoisture4;
+    if (pinId == "wSoilMstrMin") return pinWSoilMstrMin;
+    if (pinId == "watering") return pinWatering;
 
     return -1;
 }
@@ -130,6 +136,8 @@ int &AppBlynk::getIntCacheValue(String pinId) {
     if (pinId == "soilMoisture2") return soilMoistureCache2;
     if (pinId == "soilMoisture3") return soilMoistureCache3;
     if (pinId == "soilMoisture4") return soilMoistureCache4;
+    if (pinId == "wSoilMstrMin") return pinWSoilMstrMinCache;
+    if (pinId == "watering") return pinWateringCache;
 
     return fishIntCache;
 }
@@ -191,6 +199,7 @@ void syncHighFreq() { // every 2 sec
     AppBlynk::postData("soilMoisture2", Sensor::getSoilMoisture(SOIL_SENSOR_2, SOIL_SENSOR_2_MIN, SOIL_SENSOR_2_MAX));
     AppBlynk::postData("soilMoisture3", Sensor::getSoilMoisture(SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX));
     AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX));
+    AppBlynk::postData("watering", Relay::isWateringOn() ? 255 : 0);
 
 #if PRODUCTION
     bool humidityHasWater = Sensor::humidityHasWater();
@@ -232,6 +241,11 @@ BLYNK_WRITE(V21) { // otaBin
     const char* pin = "otaBin";
     String& variable = AppBlynk::getStringVariable(pin);
     AppBlynk::getData(variable, pin, param.asStr(), true);
+}
+BLYNK_WRITE(V23) { // wSoilMstrMin
+    const char* pin = "wSoilMstrMin";
+    int& variable = AppBlynk::getIntVariable(pin);
+    AppBlynk::getData(variable, pin, param.asInt(), true);
 }
 BLYNK_WRITE(V10) { // ping
     if (param.asInt() == 1) {

@@ -26,6 +26,8 @@ public:
     static bool humidityHasWater();
 
     static unsigned int getSoilMoisture(int id, int min, int max);
+
+    static bool wateringHasWater();
 };
 
 #endif /* Sensor_h */

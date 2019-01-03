@@ -10,6 +10,7 @@
 #include "Relay.h"
 #include "AppSerial.h"
 #include "AppBlynk.h"
+#include "Watering.h"
 
 static const char *TAG = "growbox";
 
@@ -38,6 +39,7 @@ int ventHumMax = 65; // ventilationHumidityMax
 int ventTempMax = 35; // ventilationTemperatureMax
 int windTempMin = 18;
 int windHumMin = 35;
+int wSoilMstrMin = 30;
 unsigned long ventilationProphylaxisLastTime = 0;
 
 // light settings
@@ -129,6 +131,13 @@ void setup() {
     Relay::humidityOff();
     Relay::lightOff();
     Relay::windOff();
+    Relay::wateringMixingOff();
+    Relay::wateringCloseValve("s1");
+    Relay::wateringCloseValve("s2");
+    Relay::wateringCloseValve("s3");
+    Relay::wateringCloseValve("s4");
+    Relay::wateringCloseValve("sHumidity");
+    Relay::wateringOff();
 
     // restore preferences
     AppStorage::setVariable(&lightDayStart, "lightDayStart");
@@ -137,6 +146,7 @@ void setup() {
     AppStorage::setVariable(&ventHumMax, "ventHumMax");
     AppStorage::setVariable(&otaHost, "otaHost");
     AppStorage::setVariable(&otaBin, "otaBin");
+    AppStorage::setVariable(&wSoilMstrMin, "wSoilMstrMin");
     AppStorage::restore();
 
     // setup wifi ip address etc.
@@ -160,6 +170,7 @@ void setup() {
     AppBlynk::setVariable(&ventHumMax, "ventHumMax");
     AppBlynk::setVariable(&otaHost, "otaHost");
     AppBlynk::setVariable(&otaBin, "otaBin");
+    AppBlynk::setVariable(&wSoilMstrMin, "wSoilMstrMin");
 
     // start Blynk connection
     AppBlynk::initiate();
@@ -198,6 +209,8 @@ void loop() {
         otaUpdateHandler();
         otaCheckUpdateLastTime = millis();
     }
+
+    Watering::check(wSoilMstrMin);
 
     AppBlynk::run();
 }

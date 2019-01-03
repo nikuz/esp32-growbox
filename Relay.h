@@ -42,6 +42,23 @@ public:
     static void windOn();
 
     static void windOff();
+
+    // watering
+    static bool isWateringOn();
+
+    static void wateringMixingOn();
+
+    static void wateringMixingOff();
+
+    static bool wateringValveIsOpen(char *valveId);
+
+    static void wateringOpenValve(char *valveId);
+
+    static void wateringCloseValve(char *valveId);
+
+    static void wateringOn();
+
+    static void wateringOff();
 };
 
 #endif /* Relay_h */

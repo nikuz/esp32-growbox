@@ -84,6 +84,8 @@ bool Sensor::humidityHasWater() {
 //    return humidityWater;
 }
 
+// soil moisture
+
 unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
     int value = soilMoisture[sensorId - 1];
 
@@ -97,4 +99,10 @@ unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
     }
 
     return value;
+}
+
+// watering
+
+bool Sensor::wateringHasWater() {
+    return wateringWater;
 }
