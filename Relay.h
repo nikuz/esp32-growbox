@@ -35,6 +35,13 @@ public:
     static void humidityOn();
 
     static void humidityOff();
+
+    // wind
+    static bool isWindOn();
+
+    static void windOn();
+
+    static void windOff();
 };
 
 #endif /* Relay_h */

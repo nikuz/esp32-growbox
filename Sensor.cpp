@@ -28,12 +28,10 @@ void Sensor::parseSerialCommand(const char *command, const char *param) {
         currentHumidity = value;
     }
     if (strcmp(command, "humw") == 0) {
-        int hasWater = value;
-        humidityWater = hasWater == 1;
+    	humidityWater = value == 1;
     }
     if (strcmp(command, "water") == 0) {
-        int hasWater = value;
-        humidityWater = hasWater == 1;
+        wateringWater = value == 1;
     }
     if (strcmp(command, "s1") == 0) {
         soilMoisture[0] = value;
@@ -82,7 +80,8 @@ bool Sensor::humidityLessThan(int minValue) {
 }
 
 bool Sensor::humidityHasWater() {
-    return humidityHasWater;
+	return true;
+//    return humidityWater;
 }
 
 unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {

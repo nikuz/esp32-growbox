@@ -1,7 +1,7 @@
 #define PRODUCTION 1    // production
 //#define PRODUCTION 0    // development
 
-#define VERSION 43
+#define VERSION 44
 
 #if PRODUCTION
 #define VERSION_MARKER "P"

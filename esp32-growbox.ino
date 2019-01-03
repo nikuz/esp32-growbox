@@ -36,6 +36,8 @@ unsigned long sensorsReadLastTime = 0;
 const int ventilationProphylaxisInterval = 60;  // check ventilation every minute
 int ventHumMax = 65; // ventilationHumidityMax
 int ventTempMax = 35; // ventilationTemperatureMax
+int windTempMin = 18;
+int windHumMin = 35;
 unsigned long ventilationProphylaxisLastTime = 0;
 
 // light settings
@@ -68,6 +70,7 @@ void screenRefresh() {
 }
 
 void sensorsRead() {
+    // ventilation
     if (Sensor::temperatureMoreThan(ventTempMax) || Sensor::humidityMoreThan(ventHumMax + 10)) {
         Relay::ventilationOn();
     } else if (
@@ -78,10 +81,18 @@ void sensorsRead() {
         Relay::ventilationOff();
     }
 
+    // humidity
     if (Sensor::humidityMoreThan(0) && Sensor::humidityLessThan(ventHumMax - 10) && Sensor::humidityHasWater()) {
         Relay::humidityOn();
     } else if (Sensor::humidityMoreThan(ventHumMax)) {
         Relay::humidityOff();
+    }
+
+    // wind
+    if (Sensor::temperatureLessThan(windTempMin) || Sensor::humidityLessThan(windHumMin)) {
+        Relay::windOff();
+    } else {
+        Relay::windOn();
     }
 }
 
@@ -98,21 +109,26 @@ void hourCheck() {
 }
 
 void setup() {
+    // initiate screen first to show loading state
     Screen::initiate();
 
-    // Begin Serials
+    // Begin debug Serial
     Serial.begin(115200);
     while (!Serial) {
         ;
     }
 
-    // setup wifi ip address etc.
-    AppWiFi::connect();
-
+    // Begin Mega communication Serial
     Serial2.begin(115200);
     while (!Serial2) {
         ;
     }
+
+    // initially off all the loads
+    Relay::ventilationOff();
+    Relay::humidityOff();
+    Relay::lightOff();
+    Relay::windOff();
 
     // restore preferences
     AppStorage::setVariable(&lightDayStart, "lightDayStart");
@@ -123,10 +139,15 @@ void setup() {
     AppStorage::setVariable(&otaBin, "otaBin");
     AppStorage::restore();
 
+    // setup wifi ip address etc.
+    AppWiFi::connect();
+
+    //get internet time
     AppTime::obtainSNTP();
 
+    // update RTC time on Mega by internet time
     struct tm ntpTime = {0};
-    if (AppTime::localTime(&ntpTime)) { // update RTC on mega by NTP time
+    if (AppTime::localTime(&ntpTime)) {
         const char *timeParam = AppTime::getTimeString(ntpTime);
         SerialFrame timeFrame = SerialFrame("time", timeParam);
         AppSerial::sendFrame(&timeFrame);
@@ -140,6 +161,7 @@ void setup() {
     AppBlynk::setVariable(&otaHost, "otaHost");
     AppBlynk::setVariable(&otaBin, "otaBin");
 
+    // start Blynk connection
     AppBlynk::initiate();
 }
 
@@ -148,7 +170,7 @@ void loop() {
     while (Serial.available() > 0) {
         Serial2.write(char(Serial.read()));
     }
-//    Serial.println("Loop is happening");
+    // read serial data from Mega
     SerialFrame serialFrame = AppSerial::getFrame();
     if (strcmp(serialFrame.command, "") != 0) {
         AppTime::parseSerialCommand(serialFrame.command, serialFrame.param);

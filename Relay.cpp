@@ -3,6 +3,7 @@
 #include "def.h"
 #include "Relay.h"
 #include "AppSerial.h"
+#include "Sensor.h"
 
 const char relayOnSerialCommand[] = "rOn";
 const char relayOffSerialCommand[] = "rOf";
@@ -18,6 +19,9 @@ unsigned long ventilationEnableLastTime = 0L;
 
 // humidity
 bool humidityEnabled = false;
+
+// wind
+bool windEnabled = false;
 
 Relay::Relay() {}
 
@@ -37,6 +41,10 @@ void Relay::parseSerialCommand(const char *command, const char *param) {
             humidityEnabled = true;
             Serial.println("Humidity ON.");
         }
+        if (strcmp(param, "wind") == 0) {
+            windEnabled = true;
+            Serial.println("Wind ON.");
+        }
     } else if (strcmp(command, "rOf") == 0) {
         if (strcmp(param, "light") == 0) {
             lightEnabled = false;
@@ -50,6 +58,10 @@ void Relay::parseSerialCommand(const char *command, const char *param) {
         if (strcmp(param, "humidity") == 0) {
             humidityEnabled = false;
             Serial.println("Humidity OFF.");
+        }
+        if (strcmp(param, "wind") == 0) {
+            windEnabled = false;
+            Serial.println("Wind OFF.");
         }
     }
 }
@@ -109,11 +121,29 @@ bool Relay::isHumidityOn() {
 }
 
 void Relay::humidityOn() {
-	SerialFrame humidityFrame = SerialFrame(relayOnSerialCommand, "humidity");
-	AppSerial::sendFrame(&humidityFrame);
+	if (Sensor::humidityHasWater()) {
+		SerialFrame humidityFrame = SerialFrame(relayOnSerialCommand, "humidity");
+    	AppSerial::sendFrame(&humidityFrame);
+	}
 }
 
 void Relay::humidityOff() {
 	SerialFrame humidityFrame = SerialFrame(relayOffSerialCommand, "humidity");
 	AppSerial::sendFrame(&humidityFrame);
+}
+
+// wind
+
+bool Relay::isWindOn() {
+    return windEnabled;
+}
+
+void Relay::windOn() {
+    SerialFrame windFrame = SerialFrame(relayOnSerialCommand, "wind");
+    AppSerial::sendFrame(&windFrame);
+}
+
+void Relay::windOff() {
+    SerialFrame windFrame = SerialFrame(relayOffSerialCommand, "wind");
+    AppSerial::sendFrame(&windFrame);
 }
