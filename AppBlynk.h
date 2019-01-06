@@ -51,6 +51,10 @@ public:
 
     static void terminal(String value);
 
+    static void sync();
+
+    static void syncHighFreq();
+
 private:
     static int getPinById(String pinId);
 

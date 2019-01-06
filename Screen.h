@@ -23,7 +23,15 @@ public:
 
     static void printTime(struct tm localtime);
 
+    static void printUptime();
+
     static void printHumidityWater(bool hasWater);
+
+    static void printWater(bool hasWater);
+
+    static void printWaterLeakage(bool leakageDetected);
+
+    static void refresh();
 };
 
 #endif /* Screen_h */

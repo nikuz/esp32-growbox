@@ -6,13 +6,6 @@ Tools::Tools() {}
 
 Tools::~Tools() {}
 
-bool Tools::lightDayDiapasonMatch(int hour, int lightDayStart, int lightDayEnd) {
-    if (lightDayStart > lightDayEnd) {
-        return hour >= lightDayStart || hour < lightDayEnd;
-    }
-    return hour >= lightDayStart && hour < lightDayEnd;
-}
-
 String Tools::getUptime() {
     char uptimeString[4];
     const float uptime = millis() / 1000.0L / 60.0L;
@@ -85,7 +78,3 @@ char *Tools::stringReplace(char *str, char *find, char *replace) {
     return str;
 }
 
-bool Tools::timerCheck(int interval, unsigned long lastInitiate) {
-    unsigned long now = millis();
-    return (interval * 1000L) < now && now - (interval * 1000L) > lastInitiate;
-}

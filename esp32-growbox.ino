@@ -1,4 +1,5 @@
 #include <EspOta.h>
+#include <SimpleTimer.h>
 
 #include "def.h"
 #include "AppWiFi.h"
@@ -14,6 +15,7 @@
 #include "Light.h"
 
 static const char *TAG = "growbox";
+static SimpleTimer *timer = AppTime::getTimer();
 
 // OTA settings
 String otaHost = "selfproduct.com";
@@ -24,31 +26,34 @@ String otaBin = "/esp32-updates/growbox.bin";
 String otaBin = "/esp32-updates/growbox-dev.bin";
 #endif
 EspOta otaUpdate(otaHost, otaPort, otaBin, TAG);
-int otaCheckUpdateInterval = 60;  // check OTA update every minute
-unsigned long otaCheckUpdateLastTime = 0;
+int otaCheckUpdateInterval = 60L * 1000L;  // check OTA update every minute
 
-const int screenRefreshInterval = 2; // refresh screen every 2 seconds
-unsigned long screenRefreshLastTime = 0;
+const int screenRefreshInterval = 2L * 1000L; // refresh screen every 2 seconds
 
 // temperature/humidity settings
-const int sensorsReadInterval = 2;  // read sensor every 2 seconds
-unsigned long sensorsReadLastTime = 0;
+const int sensorsReadInterval = 2L * 1000L;  // read sensor every 2 seconds
 
 // ventilation settings
-const int ventilationProphylaxisInterval = 60;  // check ventilation every minute
-int ventHumMax = 65; // ventilationHumidityMax
+const int ventilationProphylaxisInterval = 60L * 1000L;  // check ventilation every minute
+int ventHumMax = 65;  // ventilationHumidityMax
 int ventTempMax = 35; // ventilationTemperatureMax
 int windTempMin = 18;
 int windHumMin = 35;
-int wSoilMstrMin = 30;
-unsigned long ventilationProphylaxisLastTime = 0;
 
 // light settings
-const int hourCheckInterval = 1;  // check current hour every second
-unsigned long hourCheckLastTime = 0;
+const int hourCheckInterval = 1L * 1000L;  // check current hour every second
 int lightDayStart = 0;  // 00:00 by default
 int lightDayEnd = 17;   // 17:00 by default
 int lightMaxInt = 50;   // in percents
+unsigned long setIntensityInterval = 60L * 1000L; // set light intensity once in minute
+
+// watering
+int wateringInterval = 5L * 1000L; // check every 5 seconds
+int autoWatering = 0; // auto watering disabled by default
+int wSoilMstrMin = 30;
+
+const int blynkSyncInterval = 60L * 1000L;  // sync blynk low freq state every 60 seconds
+const int blynkSyncHighFreqInterval = 2L * 1000L;  // sync blynk high freq state every 2 seconds
 
 void otaUpdateHandler() {
 	if (otaUpdate._host != otaHost || otaUpdate._bin != otaBin) {
@@ -57,23 +62,14 @@ void otaUpdateHandler() {
     otaUpdate.begin(AppTime::getTimeString(AppTime::getCurrentTime()));
 }
 
-void screenRefresh() {
-    const int currentHour = AppTime::getCurrentHour();
-
-    Screen::clearBuffer();
-    Screen::printTemperature(Sensor::temperatureGet(), Sensor::humidityGet());
-    Screen::printHumidityWater(Sensor::humidityHasWater());
-    Screen::printAppVersion();
-
-    if (currentHour != -1) {
-        Screen::printDayStrip(currentHour, lightDayStart, lightDayEnd);
-        Screen::printTime(AppTime::getCurrentTime());
+void sensorsRead() {
+    if (Sensor::doorIsOpen()) {
+        Relay::humidityOff();
+        Relay::windOff();
+        Relay::ventilationOff();
+        return;
     }
 
-    Screen::sendBuffer();
-}
-
-void sensorsRead() {
     // ventilation
     if (Sensor::temperatureMoreThan(ventTempMax) || Sensor::humidityMoreThan(ventHumMax + 10)) {
         Relay::ventilationOn();
@@ -98,12 +94,6 @@ void sensorsRead() {
     } else {
         Relay::windOn();
     }
-
-    if (Sensor::doorIsOpen()) {
-        Relay::humidityOff();
-        Relay::windOn();
-        Relay::ventilationOff();
-    }
 }
 
 void hourCheck() {
@@ -111,7 +101,7 @@ void hourCheck() {
     if (currentHour == -1) {
         return;
     }
-    if (Tools::lightDayDiapasonMatch(currentHour, lightDayStart, lightDayEnd)) {
+    if (AppTime::lightDayDiapasonMatch(currentHour)) {
         Relay::lightOn();
     } else {
         Relay::lightOff();
@@ -135,10 +125,10 @@ void setup() {
     }
 
     // initially off all the loads
-    Relay::ventilationOff();
-    Relay::humidityOff();
-    Relay::lightOff();
-    Relay::windOff();
+//    Relay::ventilationOff();
+//    Relay::humidityOff();
+//    Relay::lightOff();
+//    Relay::windOff();
     Relay::wateringMixingOff();
     Relay::wateringCloseValve("s1");
     Relay::wateringCloseValve("s2");
@@ -156,12 +146,15 @@ void setup() {
     AppStorage::setVariable(&otaBin, "otaBin");
     AppStorage::setVariable(&wSoilMstrMin, "wSoilMstrMin");
     AppStorage::setVariable(&lightMaxInt, "lightMaxInt");
+    AppStorage::setVariable(&autoWatering, "autoWatering");
     AppStorage::restore();
 
     // setup wifi ip address etc.
     AppWiFi::connect();
 
     //get internet time
+    AppTime::setVariable(&lightDayStart, "lightDayStart");
+    AppTime::setVariable(&lightDayEnd, "lightDayEnd");
     AppTime::obtainSNTP();
 
     // update RTC time on Mega by internet time
@@ -172,6 +165,9 @@ void setup() {
         AppSerial::sendFrame(&timeFrame);
     }
 
+    Watering::setVariable(&autoWatering, "autoWatering");
+    Watering::setVariable(&wSoilMstrMin, "wSoilMstrMin");
+
     // register Blynk variables
     AppBlynk::setVariable(&lightDayStart, "lightDayStart");
     AppBlynk::setVariable(&lightDayEnd, "lightDayEnd");
@@ -181,9 +177,20 @@ void setup() {
     AppBlynk::setVariable(&otaBin, "otaBin");
     AppBlynk::setVariable(&wSoilMstrMin, "wSoilMstrMin");
     AppBlynk::setVariable(&lightMaxInt, "lightMaxInt");
+    AppBlynk::setVariable(&autoWatering, "autoWatering");
 
     // start Blynk connection
     AppBlynk::initiate();
+
+    timer->setInterval(sensorsReadInterval, sensorsRead);
+    timer->setInterval(hourCheckInterval, hourCheck);
+    timer->setInterval(ventilationProphylaxisInterval, Relay::ventilationProphylaxis);
+    timer->setInterval(wateringInterval, Watering::check);
+    timer->setInterval(screenRefreshInterval, Screen::refresh);
+    timer->setInterval(setIntensityInterval, Light::setIntensity);
+    timer->setInterval(otaCheckUpdateInterval, otaUpdateHandler);
+    timer->setInterval(blynkSyncInterval, AppBlynk::sync);
+    timer->setInterval(blynkSyncHighFreqInterval, AppBlynk::syncHighFreq);
 }
 
 void loop() {
@@ -200,29 +207,7 @@ void loop() {
         Light::parseSerialCommand(serialFrame.command, serialFrame.param);
     }
 
-    if (Tools::timerCheck(sensorsReadInterval, sensorsReadLastTime)) {
-        sensorsRead();
-        sensorsReadLastTime = millis();
-    }
-    if (Tools::timerCheck(hourCheckInterval, hourCheckLastTime)) {
-        hourCheck();
-        hourCheckLastTime = millis();
-    }
-    if (Tools::timerCheck(ventilationProphylaxisInterval, ventilationProphylaxisLastTime)) {
-        Relay::ventilationProphylaxis();
-        ventilationProphylaxisLastTime = millis();
-    }
-    if (Tools::timerCheck(screenRefreshInterval, screenRefreshLastTime)) {
-        screenRefresh();
-        screenRefreshLastTime = millis();
-    }
-    if (Tools::timerCheck(otaCheckUpdateInterval, otaCheckUpdateLastTime)) {
-        otaUpdateHandler();
-        otaCheckUpdateLastTime = millis();
-    }
-
-    Watering::check(wSoilMstrMin);
-    Light::setIntensity(lightDayStart, lightDayEnd, lightMaxInt);
-
     AppBlynk::run();
+
+    timer->run();
 }

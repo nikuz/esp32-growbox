@@ -41,19 +41,9 @@ void AppWiFi::connect() {
     }
     if (!WiFi.isConnected()) {
         Serial.println("WiFi connect failed");
-        delay(1000);
-        ESP.restart();
     }
 }
 
 bool AppWiFi::isConnected() {
     return WiFi.isConnected();
-}
-
-const char *AppWiFi::getSSID() {
-    return SSID;
-}
-
-const char *AppWiFi::getPSWD() {
-    return PSWD;
 }

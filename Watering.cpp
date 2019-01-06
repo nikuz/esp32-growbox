@@ -1,15 +1,18 @@
 #include <Arduino.h>
+#include <SimpleTimer.h>
 
 #include "def.h"
 #include "Watering.h"
-#include "Tools.h"
+#include "AppTime.h"
 #include "Sensor.h"
 #include "Relay.h"
 
-int wateringInterval = 5;  // check every 5 seconds
-unsigned long wateringLastTime = 0;
-int wateringProgressCheckInterval = 1;  // check every second
-unsigned long wateringProgressCheckLastTime = 0;
+static SimpleTimer *timer = AppTime::getTimer();
+
+static WateringVariable variables[2];
+static int blankVariable = -1;
+
+int wateringProgressCheckInterval = 1L * 1000L;  // check every second
 
 bool wateringStarted = false;
 char wateringStartedFor[10];
@@ -46,6 +49,17 @@ unsigned int moistureStarted = 0;
 Watering::Watering() {}
 
 Watering::~Watering() {}
+
+int &Watering::getVariable(const char *key) {
+    const int varsLen = *(&variables + 1) - variables;
+    for (int i = 0; i < varsLen; i++) {
+        if (variables[i].key == key) {
+            return *variables[i].var;
+        }
+    }
+
+    return blankVariable;
+}
 
 void stop() {
     Relay::wateringMixingOff();
@@ -279,10 +293,11 @@ void mixing() {
 
 // soil moisture check (1 stage)
 
-void soilMoisture(int &wSoilMstrMin) {
+void soilMoisture() {
     if (wateringStarted || noWaterOrLeakageDetected()) {
         return;
     }
+    int &wSoilMstrMin = Watering::getVariable("wSoilMstrMin");
     const char* firstPot = "s1";
     unsigned int firstPotMoisture = getSoilMoisture(firstPot);
     if (firstPotMoisture < wSoilMstrMin) {
@@ -330,22 +345,35 @@ void soilMoisture(int &wSoilMstrMin) {
     }
 }
 
+void checkProgress() {
+    mixing();
+    valve();
+    testWatering();
+    waitBeforeMoistureRecheck();
+    moistureRecheck();
+    mainWatering();
+    stopping();
+}
+
 // public
 
-void Watering::check(int &wSoilMstrMin) {
-    if (Tools::timerCheck(wateringInterval, wateringLastTime)) {
-        soilMoisture(wSoilMstrMin);
-        wateringLastTime = millis();
+void Watering::setVariable(int *var, const char *key) {
+    int varsLen = *(&variables + 1) - variables;
+    for (int i = 0; i < varsLen; i++) {
+        if (!variables[i].key) {
+            variables[i] = WateringVariable(var, key);
+            break;
+        }
     }
-    if (Tools::timerCheck(wateringProgressCheckInterval, wateringProgressCheckLastTime)) {
-        mixing();
-        valve();
-        testWatering();
-        waitBeforeMoistureRecheck();
-        moistureRecheck();
-        mainWatering();
-        stopping();
-        wateringProgressCheckLastTime = millis();
+}
+
+void Watering::initiate() {
+    timer->setInterval(wateringProgressCheckInterval, checkProgress);
+}
+
+void Watering::check() {
+    if (getVariable("autoWatering") == 1) {
+        soilMoisture();
     }
 }
 

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Time.h>
+#include <SimpleTimer.h>
 
 #include "def.h"
 #include "AppTime.h"
@@ -12,6 +13,10 @@ const char *ntpServer2 = "0.europe.pool.ntp.org";
 const char *ntpServer3 = "1.europe.pool.ntp.org";
 const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 0;
+static AppTimeVariable variables[2];
+static int blankVariable = -1;
+
+SimpleTimer timer;
 
 struct tm RTCCurrentTime = {
         tm_sec: -1,
@@ -190,3 +195,44 @@ void AppTime::print() {
     AppBlynk::terminal(rtcTimeStr);
 }
 
+void AppTime::setVariable(int *var, const char *key) {
+    int varsLen = *(&variables + 1) - variables;
+    for (int i = 0; i < varsLen; i++) {
+        if (!variables[i].key) {
+            variables[i] = AppTimeVariable(var, key);
+            break;
+        }
+    }
+}
+
+int &AppTime::getVariable(const char *key) {
+    const int varsLen = *(&variables + 1) - variables;
+    for (int i = 0; i < varsLen; i++) {
+        if (variables[i].key == key) {
+            return *variables[i].var;
+        }
+    }
+
+    return blankVariable;
+}
+
+int &AppTime::getLightDayStart() {
+    return getVariable("lightDayStart");
+}
+
+int &AppTime::getLightDayEnd() {
+    return getVariable("lightDayEnd");
+}
+
+bool AppTime::lightDayDiapasonMatch(int hour) {
+    int& lightDayStart = getLightDayStart();
+    int& lightDayEnd = getLightDayEnd();
+    if (lightDayStart > lightDayEnd) {
+        return hour >= lightDayStart || hour < lightDayEnd;
+    }
+    return hour >= lightDayStart && hour < lightDayEnd;
+}
+
+SimpleTimer *AppTime::getTimer() {
+    return &timer;
+}

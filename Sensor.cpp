@@ -27,7 +27,7 @@ Sensor::Sensor() {}
 Sensor::~Sensor() {}
 
 void Sensor::parseSerialCommand(const char *command, const char *param) {
-    int value = Tools::StringToUint8(param);
+    int value = atoi(param);
     if (strcmp(command, "temp") == 0) {
         currentTemperature = value;
     }
@@ -40,16 +40,16 @@ void Sensor::parseSerialCommand(const char *command, const char *param) {
     if (strcmp(command, "water") == 0) {
         wateringWater = value == 1;
     }
-    if (strcmp(command, "s1") == 0) {
+    if (strcmp(command, "soil1") == 0) {
         soilMoisture[0] = value;
     }
-    if (strcmp(command, "s2") == 0) {
+    if (strcmp(command, "soil2") == 0) {
         soilMoisture[1] = value;
     }
-    if (strcmp(command, "s3") == 0) {
+    if (strcmp(command, "soil3") == 0) {
         soilMoisture[2] = value;
     }
-    if (strcmp(command, "s4") == 0) {
+    if (strcmp(command, "soil4") == 0) {
         soilMoisture[3] = value;
     }
     if (strcmp(command, "rain1") == 0) {

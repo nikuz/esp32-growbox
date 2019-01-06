@@ -52,9 +52,9 @@ SerialFrame AppSerial::getFrame() {
     }
 
     if (gotCommand) {
-//        Serial.print(command);
-//        Serial.print(frameDelimiter);
-//        Serial.println(param);
+        Serial.print(command);
+        Serial.print(frameDelimiter);
+        Serial.println(param);
 
 //        //
 //        if (strcmp(param, "first") == 0) {

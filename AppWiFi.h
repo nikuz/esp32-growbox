@@ -11,10 +11,6 @@ public:
 
     static void connect();
 
-    static const char *getSSID();
-
-    static const char *getPSWD();
-
     static bool isConnected();
 };
 

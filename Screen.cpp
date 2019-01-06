@@ -1,10 +1,11 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 
+#include "def.h"
 #include "Screen.h"
 #include "AppTime.h"
 #include "Tools.h"
-#include "def.h"
+#include "Sensor.h"
 
 #if PRODUCTION
 U8G2_SH1106_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, 21, 22, U8X8_PIN_NONE);
@@ -75,7 +76,7 @@ void Screen::printDayStrip(int currentHour, int lightDayStart, int lightDayEnd) 
         int boxHeight = i == currentHour ? 14 : 10;
         int margin = i == currentHour ? 2 : 0;
         u8g2_uint_t row = (i * boxWidth) + (i * gapWidth);
-        if (Tools::lightDayDiapasonMatch(i, lightDayStart, lightDayEnd)) {
+        if (AppTime::lightDayDiapasonMatch(i)) {
             u8g2.drawBox(row, line - margin, boxWidth, boxHeight);
         } else {
             u8g2.drawFrame(row, line - margin, boxWidth, boxHeight);
@@ -104,19 +105,61 @@ void Screen::printTime(struct tm localtime) {
     u8g2.print(AppTime::getTimeString(localtime, "%02u/%02u/%04u %02u:%02u"));
 }
 
-void Screen::printHumidityWater(bool hasWater) {
-    const int line = 47;
+void Screen::printUptime() {
+    u8g2_uint_t displayHeight = u8g2.getDisplayHeight();
+
     u8g2.setFont(u8g2_font_crox2cb_tr);
-    u8g2.setCursor(0, line);
-    const char marker[] = "H";
+    u8g2.setCursor(0, displayHeight);
+    const String uptime = Tools::getUptime();
+    char uptimeStr[uptime.length() + 1];
+    strcpy(uptimeStr, uptime.c_str());
+    u8g2.print(uptimeStr);
+}
+
+void printMarkerWithCircle(char *marker, bool enabled, int line, int margin) {
+    u8g2.setFont(u8g2_font_crox2cb_tr);
+    u8g2.setCursor(margin, line);
     const int markerWidth = u8g2.getStrWidth(marker);
     const int radius = 5;
-    const int left = markerWidth + radius + 2;
+    const int left = markerWidth + radius + 2 + margin;
     const int top = line - radius;
     u8g2.print(marker);
-    if (hasWater) {
+    if (enabled) {
         u8g2.drawDisc(left, top, radius, U8G2_DRAW_ALL);
     } else {
         u8g2.drawCircle(left, top, radius, U8G2_DRAW_ALL);
     }
+}
+
+void Screen::printHumidityWater(bool hasWater) {
+    printMarkerWithCircle("H", hasWater, 47, 0);
+}
+
+void Screen::printWater(bool hasWater) {
+    printMarkerWithCircle("W", hasWater, 47, 35);
+}
+
+void Screen::printWaterLeakage(bool leakageDetected) {
+    printMarkerWithCircle("L", leakageDetected, 47, 70);
+}
+
+void Screen::refresh() {
+    const int currentHour = AppTime::getCurrentHour();
+    int& lightDayStart = AppTime::getLightDayStart();
+    int& lightDayEnd = AppTime::getLightDayEnd();
+
+    clearBuffer();
+    printTemperature(Sensor::temperatureGet(), Sensor::humidityGet());
+    printHumidityWater(Sensor::humidityHasWater());
+    printWater(Sensor::wateringHasWater());
+    printWaterLeakage(Sensor::waterLeakageDetected());
+    printAppVersion();
+
+    if (currentHour != -1) {
+        printDayStrip(currentHour, lightDayStart, lightDayEnd);
+//        Screen::printTime(AppTime::getCurrentTime());
+        printUptime();
+    }
+
+    sendBuffer();
 }

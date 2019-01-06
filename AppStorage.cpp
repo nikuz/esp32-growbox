@@ -49,8 +49,8 @@ void AppStorage::putString(const char *key, String value) {
 }
 
 void AppStorage::setVariable(int *var, const char *key) {
-    int urlCounts = *(&intVariables + 1) - intVariables;
-    for (int i = 0; i < urlCounts; i++) {
+    int intVarsLen = *(&intVariables + 1) - intVariables;
+    for (int i = 0; i < intVarsLen; i++) {
         if (!intVariables[i].key) {
             intVariables[i] = StorageIntVariable(var, key);
             break;
@@ -59,8 +59,8 @@ void AppStorage::setVariable(int *var, const char *key) {
 }
 
 void AppStorage::setVariable(String *var, const char *key) {
-    int urlCounts = *(&stringVariables + 1) - stringVariables;
-    for (int i = 0; i < urlCounts; i++) {
+    int stringVarsLen = *(&stringVariables + 1) - stringVariables;
+    for (int i = 0; i < stringVarsLen; i++) {
         if (!stringVariables[i].key) {
             stringVariables[i] = StorageStringVariable(var, key);
             break;
