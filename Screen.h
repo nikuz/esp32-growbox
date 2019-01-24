@@ -15,7 +15,7 @@ public:
 
     static void sendBuffer();
 
-    static void printTemperature(int currentTemperature, int currentHumidity);
+    static void printTemperature(float currentTemperature, float currentHumidity);
 
     static void printDayStrip(int currentHour, int lightDayStart, int lightDayEnd);
 

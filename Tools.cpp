@@ -1,38 +1,23 @@
 #include <Arduino.h>
 
 #include "Tools.h"
+#include "AppTime.h"
 
 Tools::Tools() {}
 
 Tools::~Tools() {}
 
-String Tools::getUptime() {
-    char uptimeString[4];
-    const float uptime = millis() / 1000.0L / 60.0L;
-    dtostrf(uptime, 3, 1, uptimeString);
-    return uptime > 60 ? String(uptime / 60) + "h" : String(uptimeString) + "m";
-}
-
-// Utility to extract header value from headers
-String Tools::getHeaderValue(String header, String headerName) {
-    return header.substring(strlen(headerName.c_str()));
-}
-
-uint8_t Tools::StringToUint8(const char *pString) {
-    uint8_t value = 0;
-
-    // skip leading 0 and spaces
-    while ('0' == *pString || *pString == ' ') {
-        pString++;
+char *Tools::getUptime() {
+    static char uptimeString[5];
+    uint32_t overflowMillis = AppTime::getOverFlowCounter() * 4294968;
+    const float uptime = (overflowMillis + millis()) / 1000.0L / 60.0L;
+    dtostrf(uptime > 60 ? uptime / 60 : uptime, 3, 1, uptimeString);
+    if (uptime > 60) {
+        strcat(uptimeString, "h");
+    } else {
+        strcat(uptimeString, "m");
     }
-
-    // calculate number until we hit non-numeral char
-    while ('0' <= *pString && *pString <= '9') {
-        value *= 10;
-        value += *pString - '0';
-        pString++;
-    }
-    return value;
+    return uptimeString;
 }
 
 char *Tools::getCharArray(char *args[], int len) {
@@ -68,7 +53,7 @@ char *Tools::stringReplace(char *str, char *find, char *replace) {
     int lena = strlen(find);
     int lenb = strlen(replace);
 
-    for (char* p = str; p = strstr(p, find); ++p) {
+    for (char *p = str; p = strstr(p, find); ++p) {
         if (lena != lenb) { // shift end as needed
             memmove(p + lenb, p + lena, len - (p - str) + lenb);
         }
@@ -76,5 +61,13 @@ char *Tools::stringReplace(char *str, char *find, char *replace) {
         memcpy(p, replace, lenb);
     }
     return str;
+}
+
+bool Tools::millisOverflowIsClose() {
+    static const unsigned long millisOverflow = 4294967;
+    static const unsigned long overflowFreeTime = 10UL * 1000UL; // ten seconds before and after overflow do nothing
+    const unsigned long t = millis();
+
+    return t < overflowFreeTime || t > millisOverflow - overflowFreeTime;
 }
 

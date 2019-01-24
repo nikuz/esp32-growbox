@@ -45,15 +45,39 @@ public:
 
     static void postData(String pinId, String value);
 
+    static void postDataNoCache(String pinId, int value);
+
+    static void postDataNoCache(String pinId, String value);
+
     static int &getIntVariable(const char *pin);
 
     static String &getStringVariable(const char *pin);
 
-    static void terminal(String value);
+    static void print(String value);
+
+    static void print(char *value);
+
+    static void print(int value);
+
+    static void print(double value);
+
+    static void println(String value);
+
+    static void println(char *value);
+
+    static void println(int value);
+
+    static void println(double value);
+
+    static void checkConnect();
 
     static void sync();
 
-    static void syncHighFreq();
+    static void syncHighFreq1();
+
+    static void syncHighFreq2();
+
+    static void syncHighFreq3();
 
 private:
     static int getPinById(String pinId);

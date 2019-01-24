@@ -4,6 +4,7 @@
 #include "Relay.h"
 #include "AppSerial.h"
 #include "Sensor.h"
+#include "AppTime.h"
 
 const char relayOnSerialCommand[] = "rOn";
 const char relayOffSerialCommand[] = "rOf";
@@ -14,8 +15,8 @@ bool lightEnabled = false;
 // ventilation
 bool ventilationEnabled = false;
 bool ventilationProphylaxisEnabled = false;
-const int ventilationProphylaxisInterval = 60L * 10L;  // enable ventilation Prophylaxis every 10 minutes
-unsigned long ventilationEnableLastTime = 0L;
+const unsigned long ventilationProphylaxisInterval = 60UL * 1000UL * 10UL;  // enable ventilation Prophylaxis every 10 minutes
+struct tm ventilationEnableLastTime = {0};
 
 // humidity
 bool humidityEnabled = false;
@@ -39,92 +40,92 @@ void Relay::parseSerialCommand(const char *command, const char *param) {
     if (strcmp(command, "rOn") == 0) {
         if (strcmp(param, "light") == 0) {
             lightEnabled = true;
-            Serial.println("Light ON.");
+            DEBUG_PRINTLN("Light ON.");
         }
         if (strcmp(param, "vent") == 0) {
             ventilationEnabled = true;
-            Serial.println("Ventilation ON.");
+            DEBUG_PRINTLN("Ventilation ON.");
         }
         if (strcmp(param, "humidity") == 0) {
             humidityEnabled = true;
-            Serial.println("Humidity ON.");
+            DEBUG_PRINTLN("Humidity ON.");
         }
         if (strcmp(param, "wind") == 0) {
             windEnabled = true;
-            Serial.println("Wind ON.");
+            DEBUG_PRINTLN("Wind ON.");
         }
         if (strcmp(param, "wmixing") == 0) {
             wateringEnabled = true;
-            Serial.println("Water mixing ON.");
+            DEBUG_PRINTLN("Water mixing ON.");
         }
         if (strcmp(param, "s1") == 0) {
             wateringOpenedValve1 = true;
-            Serial.println("Open valve s1.");
+            DEBUG_PRINTLN("Open valve s1.");
         }
         if (strcmp(param, "s2") == 0) {
             wateringOpenedValve2 = true;
-            Serial.println("Open valve s2.");
+            DEBUG_PRINTLN("Open valve s2.");
         }
         if (strcmp(param, "s3") == 0) {
             wateringOpenedValve3 = true;
-            Serial.println("Open valve s3.");
+            DEBUG_PRINTLN("Open valve s3.");
         }
         if (strcmp(param, "s4") == 0) {
             wateringOpenedValve4 = true;
-            Serial.println("Open valve s4.");
+            DEBUG_PRINTLN("Open valve s4.");
         }
         if (strcmp(param, "sHumidity") == 0) {
             wateringOpenedValveHumidity = true;
-            Serial.println("Open valve sHumidity.");
+            DEBUG_PRINTLN("Open valve sHumidity.");
         }
         if (strcmp(param, "water") == 0) {
             wateringEnabled = true;
-            Serial.println("Watering ON.");
+            DEBUG_PRINTLN("Watering ON.");
         }
     } else if (strcmp(command, "rOf") == 0) {
         if (strcmp(param, "light") == 0) {
             lightEnabled = false;
-            Serial.println("Light OFF.");
+            DEBUG_PRINTLN("Light OFF.");
         }
         if (strcmp(param, "vent") == 0) {
             ventilationEnabled = false;
-            Serial.println("Ventilation OFF.");
-            ventilationEnableLastTime = millis();
+            DEBUG_PRINTLN("Ventilation OFF.");
+            ventilationEnableLastTime = AppTime::getCurrentTime();
         }
         if (strcmp(param, "humidity") == 0) {
             humidityEnabled = false;
-            Serial.println("Humidity OFF.");
+            DEBUG_PRINTLN("Humidity OFF.");
         }
         if (strcmp(param, "wind") == 0) {
             windEnabled = false;
-            Serial.println("Wind OFF.");
+            DEBUG_PRINTLN("Wind OFF.");
         }
         if (strcmp(param, "s1") == 0) {
             wateringOpenedValve1 = false;
-            Serial.println("Close valve s1.");
+            DEBUG_PRINTLN("Close valve s1.");
         }
         if (strcmp(param, "s2") == 0) {
             wateringOpenedValve2 = false;
-            Serial.println("Close valve s2.");
+            DEBUG_PRINTLN("Close valve s2.");
         }
         if (strcmp(param, "s3") == 0) {
             wateringOpenedValve3 = false;
-            Serial.println("Close valve s3.");
+            DEBUG_PRINTLN("Close valve s3.");
         }
         if (strcmp(param, "s4") == 0) {
             wateringOpenedValve4 = false;
-            Serial.println("Close valve s4.");
+            DEBUG_PRINTLN("Close valve s4.");
         }
         if (strcmp(param, "sHumidity") == 0) {
             wateringOpenedValveHumidity = false;
-            Serial.println("Close valve sHumidity.");
+            DEBUG_PRINTLN("Close valve sHumidity.");
         }
         // do not need to indicate wateringEnabled as false when wmixing off,
         // because watering process is complex, and going in cascade
         // wateringEnabled will be off on water off, this event happen on any watering terminating event
         if (strcmp(param, "water") == 0) {
             wateringEnabled = false;
-            Serial.println("Watering OFF.");
+            DEBUG_PRINTLN("Watering OFF.");
         }
     }
 }
@@ -140,24 +141,22 @@ bool Relay::isVentilationProphylaxisOn() {
 }
 
 void Relay::ventilationOn() {
-	SerialFrame ventilationFrame = SerialFrame(relayOnSerialCommand, "vent");
-	AppSerial::sendFrame(&ventilationFrame);
+    SerialFrame ventilationFrame = SerialFrame(relayOnSerialCommand, "vent");
+    AppSerial::sendFrame(&ventilationFrame);
 }
 
 void Relay::ventilationOff() {
-	SerialFrame ventilationFrame = SerialFrame(relayOffSerialCommand, "vent");
-	AppSerial::sendFrame(&ventilationFrame);
+    SerialFrame ventilationFrame = SerialFrame(relayOffSerialCommand, "vent");
+    AppSerial::sendFrame(&ventilationFrame);
 }
 
 void Relay::ventilationProphylaxis() {
-    const unsigned long interval = ventilationProphylaxisInterval * 1000L;
-    const unsigned long now = millis();
-    if (now > interval && now - interval > ventilationEnableLastTime && !ventilationEnabled) {
-        ventilationProphylaxisEnabled = true;
-        Relay::ventilationOn();
-    } else if (ventilationProphylaxisEnabled) {
+    if (ventilationProphylaxisEnabled) {
         ventilationProphylaxisEnabled = false;
         Relay::ventilationOff();
+    } else if (AppTime::compareDates(ventilationEnableLastTime, AppTime::getCurrentTime()) > ventilationProphylaxisInterval) {
+        ventilationProphylaxisEnabled = true;
+        Relay::ventilationOn();
     }
 }
 
@@ -168,13 +167,13 @@ bool Relay::isLightOn() {
 }
 
 void Relay::lightOn() {
-	SerialFrame lightFrame = SerialFrame(relayOnSerialCommand, "light");
-	AppSerial::sendFrame(&lightFrame);
+    SerialFrame lightFrame = SerialFrame(relayOnSerialCommand, "light");
+    AppSerial::sendFrame(&lightFrame);
 }
 
 void Relay::lightOff() {
-	SerialFrame lightFrame = SerialFrame(relayOffSerialCommand, "light");
-	AppSerial::sendFrame(&lightFrame);
+    SerialFrame lightFrame = SerialFrame(relayOffSerialCommand, "light");
+    AppSerial::sendFrame(&lightFrame);
 }
 
 // humidity
@@ -184,15 +183,15 @@ bool Relay::isHumidityOn() {
 }
 
 void Relay::humidityOn() {
-	if (Sensor::humidityHasWater()) {
-		SerialFrame humidityFrame = SerialFrame(relayOnSerialCommand, "humidity");
-    	AppSerial::sendFrame(&humidityFrame);
-	}
+    if (Sensor::humidityHasWater()) {
+        SerialFrame humidityFrame = SerialFrame(relayOnSerialCommand, "humidity");
+        AppSerial::sendFrame(&humidityFrame);
+    }
 }
 
 void Relay::humidityOff() {
-	SerialFrame humidityFrame = SerialFrame(relayOffSerialCommand, "humidity");
-	AppSerial::sendFrame(&humidityFrame);
+    SerialFrame humidityFrame = SerialFrame(relayOffSerialCommand, "humidity");
+    AppSerial::sendFrame(&humidityFrame);
 }
 
 // wind

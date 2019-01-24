@@ -3,6 +3,12 @@
 
 #include <Arduino.h>
 
+struct SoilMoistureSensor {
+    int sensorId;
+    int min;
+    int max;
+};
+
 class Sensor {
 public:
     Sensor();
@@ -25,7 +31,7 @@ public:
 
     static bool humidityHasWater();
 
-    static unsigned int getSoilMoisture(int id, int min, int max);
+    static int getSoilMoisture(int sensorId);
 
     static bool wateringHasWater();
 

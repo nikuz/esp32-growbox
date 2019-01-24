@@ -1,119 +1,132 @@
 #include <Arduino.h>
-#include <SimpleTimer.h>
 
 #include "def.h"
 #include "Watering.h"
 #include "AppTime.h"
+#include "AppStorage.h"
+#include "AppBlynk.h"
 #include "Sensor.h"
 #include "Relay.h"
+#include "Tools.h"
 
-static SimpleTimer *timer = AppTime::getTimer();
-
-static WateringVariable variables[2];
-static int blankVariable = -1;
-
-int wateringProgressCheckInterval = 1L * 1000L;  // check every second
+static WateringIntVariable intVariables[10];
+static WateringStringVariable stringVariables[10];
+static WateringTargetVariable targetVariables[] = {
+    {"s1", "s1LstWtrng", "s1WtrngAuto"},
+    {"s2", "s2LstWtrng", "s2WtrngAuto"},
+    {"s3", "s3LstWtrng", "s3WtrngAuto"},
+    {"s4", "s4LstWtrng", "s4WtrngAuto"},
+    {"sHumidity", "hLstWtrng", "hWtrngAuto"}
+};
+static int blankIntVariable = -1;
+static String blankStringVariable = "";
 
 bool wateringStarted = false;
 char wateringStartedFor[10];
 
 bool mainWateringStarted = false;
-unsigned long mainWateringStartedAt = 0;
-unsigned long mainWateringTime = 10L * 1000L;           // 10 sec
-unsigned long mainWateringTimeHumidity = 30L * 1000L;   // 30 sec
+struct tm mainWateringStartedAt = {0};
+const int mainWateringTime = 30;           // 30 sec
+const int mainWateringTimeHumidity = 50;   // 50 sec
+const int waitBetweenWatering = 60 * 5;           // 5 mins
 bool mainWateringPassed = false;
 
 bool moistureRecheckPassed = false;
-unsigned int moistureDifferenceThreshold = 10;
-unsigned int moistureRechecked = 0;
+int moistureDifferenceThreshold = 10;
 
 bool waitingBeforeMoistureRecheckStarted = false;
-unsigned long waitingBeforeMoistureRecheckStartedAt = 0;
-unsigned long waitingBeforeMoistureRecheckTime = 10L * 1000L;
+struct tm waitingBeforeMoistureRecheckStartedAt = {0};
+const int waitingBeforeMoistureRecheckTime = 10; // 10 sec
 bool waitingBeforeMoistureRecheckPassed = false;
 
 bool testWateringStarted = false;
-unsigned long testWateringStartedAt = 0;
-unsigned long testWateringTime = 5L * 1000L;
+struct tm testWateringStartedAt = {0};
+const int testWateringTime = 30; // 30 sec
 bool testWateringPassed = false;
 
 bool valveIsOpen = false;
 
 bool mixingStarted = false;
-unsigned long mixingEnabledAt = 0;
-unsigned long mixingTime = 30L * 1000L;
+struct tm mixingEnabledAt = {0};
+const int mixingTime = 30; // 30 sec
 bool mixingPassed = false;
 
-unsigned int moistureStarted = 0;
+int moistureStarted = 0;
 
 Watering::Watering() {}
 
 Watering::~Watering() {}
 
-int &Watering::getVariable(const char *key) {
-    const int varsLen = *(&variables + 1) - variables;
+int &Watering::getIntVariable(const char *key) {
+    const int varsLen = *(&intVariables + 1) - intVariables;
     for (int i = 0; i < varsLen; i++) {
-        if (variables[i].key == key) {
-            return *variables[i].var;
+        if (intVariables[i].key == key) {
+            return *intVariables[i].var;
         }
     }
 
-    return blankVariable;
+    return blankIntVariable;
 }
 
-void stop() {
-    Relay::wateringMixingOff();
-    Relay::wateringOff();
-    Relay::wateringCloseValve(wateringStartedFor);
-    mixingStarted = false;
-    mixingPassed = false;
-    testWateringStarted = false;
-    testWateringPassed = false;
-    valveIsOpen = false;
-    waitingBeforeMoistureRecheckStarted = false;
-    waitingBeforeMoistureRecheckStartedAt = 0;
-    waitingBeforeMoistureRecheckPassed = false;
-    mainWateringStarted = false;
-    mainWateringStartedAt = 0;
-    mainWateringPassed = false;
-    memset(wateringStartedFor, 0, sizeof wateringStartedFor);
-    moistureRechecked = 0;
-    moistureStarted = 0;
-    wateringStarted = false;
+String &Watering::getStringVariable(const char *key) {
+    const int varsLen = *(&stringVariables + 1) - stringVariables;
+    for (int i = 0; i < varsLen; i++) {
+        if (stringVariables[i].key == key) {
+            return *stringVariables[i].var;
+        }
+    }
 
-    Serial.println("Watering stopped!");
-    Serial.println();
+    return blankStringVariable;
 }
 
-unsigned int getSoilMoisture(const char *sensorId) {
+bool isWateringEnabled() {
+    bool specialWateringEnabled = false;
+    const int varsLen = *(&targetVariables + 1) - targetVariables;
+    for (int i = 0; i < varsLen; i++) {
+        if (Watering::getIntVariable(targetVariables[i].autoWateringVar)) {
+            specialWateringEnabled = true;
+        }
+    }
+    return Watering::getIntVariable("autoWatering") == 1 || specialWateringEnabled;
+}
+
+int getSoilMoisture(const char *sensorId) {
     if (strcmp(sensorId, "s1") == 0) {
-        return Sensor::getSoilMoisture(SOIL_SENSOR_1, SOIL_SENSOR_1_MIN, SOIL_SENSOR_1_MAX);
+        return Sensor::getSoilMoisture(SOIL_SENSOR_1);
     }
     if (strcmp(sensorId, "s2") == 0) {
-        return Sensor::getSoilMoisture(SOIL_SENSOR_2, SOIL_SENSOR_2_MIN, SOIL_SENSOR_2_MAX);
+        return Sensor::getSoilMoisture(SOIL_SENSOR_2);
     }
     if (strcmp(sensorId, "s3") == 0) {
-        return Sensor::getSoilMoisture(SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX);
+        return Sensor::getSoilMoisture(SOIL_SENSOR_3);
     }
     if (strcmp(sensorId, "s4") == 0) {
-        return Sensor::getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX);
+        return Sensor::getSoilMoisture(SOIL_SENSOR_4);
     }
 
     return 0;
 }
 
-bool noWaterOrLeakageDetected() {
-    if (!Sensor::wateringHasWater()) {
-        Serial.println("No water. Watering terminated!!!");
-        stop();
-        return true;
-    }
-    if (Sensor::waterLeakageDetected()) {
-        Serial.println("Water leakage detected. Watering terminated!!!");
-        return true;
-    }
+double getLastTimeWateringForPot(char *lastWateringVar) {
+    String &lastWateringTime = Watering::getStringVariable(lastWateringVar);
+    double lastWateringSec = AppTime::compareDates(lastWateringTime, AppTime::getCurrentTime());
+    return lastWateringSec > 0 ? lastWateringSec : 0;
+}
 
-    return false;
+void printLastWateringTime(char *name, double prevWateringSec) {
+    Serial.print("Prev watering for ");
+    Serial.print(name);
+    Serial.print(" was only ");
+    Serial.print(prevWateringSec);
+    Serial.println(" sec ago.");
+    Serial.print("Must be at least ");
+    Serial.print(waitBetweenWatering);
+    Serial.println(" sec.");
+}
+
+bool noWaterOrLeakageDetected() {
+//    return !Sensor::wateringHasWater() || Sensor::waterLeakageDetected();
+    return Sensor::waterLeakageDetected();
 }
 
 // stopping (8 stage)
@@ -124,37 +137,33 @@ void stopping() {
     }
 
     if (mainWateringPassed) {
-        stop();
+        Watering::stop();
     }
 }
 
 // main watering (7 stage)
 
 void mainWatering() {
-    if (!wateringStarted || !valveIsOpen || mainWateringPassed) {
+    if (!valveIsOpen || mainWateringPassed) {
         return;
     }
     const bool wateringForHumidity = strcmp(wateringStartedFor, "sHumidity") == 0;
     if (!wateringForHumidity && !moistureRecheckPassed) {
         return;
     }
-    if (noWaterOrLeakageDetected()) {
-        stop();
-        return;
-    }
     if (!mainWateringStarted) {
         Relay::wateringOn();
         mainWateringStarted = true;
-        mainWateringStartedAt = millis();
-        Serial.print("Start main watering for: ");
-        Serial.print(mainWateringTime / 1000L);
-        Serial.println("s");
+        mainWateringStartedAt = AppTime::getCurrentTime();
+        AppBlynk::print("Start main watering for: ");
+        AppBlynk::print(mainWateringTime);
+        AppBlynk::println("s");
         return;
     }
-    unsigned long wateringTime = wateringForHumidity ? mainWateringTimeHumidity : mainWateringTime;
-    if (millis() > mainWateringStartedAt + wateringTime) {
+    const int wateringTime = wateringForHumidity ? mainWateringTimeHumidity : mainWateringTime;
+    if (AppTime::compareDates(mainWateringStartedAt, AppTime::getCurrentTime()) >= wateringTime) {
         Relay::wateringOff();
-        Serial.println("Stop main watering");
+        AppBlynk::println("Stop main watering");
         mainWateringStarted = false;
         mainWateringPassed = true;
     }
@@ -163,51 +172,43 @@ void mainWatering() {
 // recheck moisture (6 stage)
 
 void moistureRecheck() {
-    if (
-        !wateringStarted
-        || !waitingBeforeMoistureRecheckPassed
-        || strcmp(wateringStartedFor, "sHumidity") == 0
-        || moistureRecheckPassed
-    ) {
+    if (!waitingBeforeMoistureRecheckPassed || strcmp(wateringStartedFor, "sHumidity") == 0 || moistureRecheckPassed) {
         return;
     }
 
-    moistureRechecked = getSoilMoisture(wateringStartedFor);
+    int moistureRechecked = getSoilMoisture(wateringStartedFor);
     if (moistureRechecked - moistureStarted > moistureDifferenceThreshold) {
+        AppBlynk::print("Moisture recheck success. Difference is: ");
+        AppBlynk::println(moistureRechecked - moistureStarted);
         moistureRecheckPassed = true;
     } else {
-        Serial.println("Moisture recheck failed!!!");
-        Serial.print("Initial moisture: ");
-        Serial.println(moistureStarted);
-        Serial.print("Rechecked moisture: ");
-        Serial.println(moistureRechecked);
-        Serial.print("Difference is: ");
-        Serial.println(moistureRechecked - moistureStarted);
-        stop();
+        AppBlynk::println("Moisture recheck failed!!!");
+        AppBlynk::print("Initial moisture: ");
+        AppBlynk::println(moistureStarted);
+        AppBlynk::print("Rechecked moisture: ");
+        AppBlynk::println(moistureRechecked);
+        AppBlynk::print("Difference is: ");
+        AppBlynk::println(moistureRechecked - moistureStarted);
+        Watering::stop();
     }
 }
 
 // wait before moisture recheck (5 stage)
 
 void waitBeforeMoistureRecheck() {
-    if (
-        !wateringStarted
-        || !testWateringPassed
-        || strcmp(wateringStartedFor, "sHumidity") == 0
-        || waitingBeforeMoistureRecheckPassed
-    ) {
+    if (!testWateringPassed || strcmp(wateringStartedFor, "sHumidity") == 0 || waitingBeforeMoistureRecheckPassed) {
         return;
     }
     if (!waitingBeforeMoistureRecheckStarted) {
         waitingBeforeMoistureRecheckStarted = true;
-        waitingBeforeMoistureRecheckStartedAt = millis();
-        Serial.print("Start waiting before moisture recheck for: ");
-        Serial.print(waitingBeforeMoistureRecheckTime / 1000L);
-        Serial.println("s");
+        waitingBeforeMoistureRecheckStartedAt = AppTime::getCurrentTime();
+        AppBlynk::print("Start waiting before moisture recheck for: ");
+        AppBlynk::print(waitingBeforeMoistureRecheckTime);
+        AppBlynk::println("s");
         return;
     }
-    if (millis() > waitingBeforeMoistureRecheckStartedAt + waitingBeforeMoistureRecheckTime) {
-        Serial.println("Stop waiting before moisture recheck");
+    if (AppTime::compareDates(waitingBeforeMoistureRecheckStartedAt, AppTime::getCurrentTime()) >= waitingBeforeMoistureRecheckTime) {
+        AppBlynk::println("Stop waiting before moisture recheck");
         waitingBeforeMoistureRecheckStarted = false;
         waitingBeforeMoistureRecheckPassed = true;
     }
@@ -216,30 +217,21 @@ void waitBeforeMoistureRecheck() {
 // test watering (4 stage)
 
 void testWatering() {
-    if (
-        !wateringStarted
-        || !valveIsOpen
-        || strcmp(wateringStartedFor, "sHumidity") == 0
-        || testWateringPassed
-    ) {
-        return;
-    }
-    if (noWaterOrLeakageDetected()) {
-        stop();
+    if (!valveIsOpen || strcmp(wateringStartedFor, "sHumidity") == 0 || testWateringPassed) {
         return;
     }
     if (!testWateringStarted) {
         Relay::wateringOn();
         testWateringStarted = true;
-        testWateringStartedAt = millis();
-        Serial.print("Start test watering for: ");
-        Serial.print(testWateringTime / 1000L);
-        Serial.println("s");
+        testWateringStartedAt = AppTime::getCurrentTime();
+        AppBlynk::print("Start test watering for: ");
+        AppBlynk::print(testWateringTime);
+        AppBlynk::println("s");
         return;
     }
-    if (millis() > testWateringStartedAt + testWateringTime) {
+    if (AppTime::compareDates(testWateringStartedAt, AppTime::getCurrentTime()) >= testWateringTime) {
         Relay::wateringOff();
-        Serial.println("Stop test watering");
+        AppBlynk::println("Stop test watering");
         testWateringStarted = false;
         testWateringPassed = true;
     }
@@ -248,44 +240,40 @@ void testWatering() {
 // open valve (3 stage)
 
 void valve() {
-    if (!wateringStarted || !mixingPassed || valveIsOpen) {
+    if (!mixingPassed || valveIsOpen) {
         return;
     }
 
     if (Relay::wateringValveIsOpen(wateringStartedFor)) {
         valveIsOpen = true;
-        Serial.print("Valve was open for: ");
-        Serial.println(wateringStartedFor);
+        AppBlynk::print("Valve was open for: ");
+        AppBlynk::println(wateringStartedFor);
         return;
     }
 
     Relay::wateringOpenValve(wateringStartedFor);
-    Serial.print("Try to open valve for: ");
-    Serial.println(wateringStartedFor);
+    AppBlynk::print("Try to open valve for: ");
+    AppBlynk::println(wateringStartedFor);
 }
 
 // water mixing (2 stage)
 
 void mixing() {
-    if (!wateringStarted || mixingPassed) {
-        return;
-    }
-    if (noWaterOrLeakageDetected()) {
-        stop();
+    if (mixingPassed) {
         return;
     }
     if (!mixingStarted) {
         Relay::wateringMixingOn();
         mixingStarted = true;
-        mixingEnabledAt = millis();
-        Serial.print("Start water mixing for: ");
-        Serial.print(mixingTime / 1000L);
-        Serial.println("s");
+        mixingEnabledAt = AppTime::getCurrentTime();
+        AppBlynk::print("Start water mixing for: ");
+        AppBlynk::print(mixingTime);
+        AppBlynk::println("s");
         return;
     }
-    if (millis() > mixingEnabledAt + mixingTime) {
+    if (AppTime::compareDates(mixingEnabledAt, AppTime::getCurrentTime()) >= mixingTime) {
         Relay::wateringMixingOff();
-        Serial.println("Stop water mixing");
+        AppBlynk::println("Stop water mixing");
         mixingStarted = false;
         mixingPassed = true;
     }
@@ -294,58 +282,134 @@ void mixing() {
 // soil moisture check (1 stage)
 
 void soilMoisture() {
-    if (wateringStarted || noWaterOrLeakageDetected()) {
-        return;
+    int &wSoilMstrMin = Watering::getIntVariable("wSoilMstrMin");
+
+    const int varsLen = *(&targetVariables + 1) - targetVariables;
+    for (int i = 0; i < varsLen; i++) {
+        char *targetVarName = targetVariables[i].name;
+        int &specialAutoWatering = Watering::getIntVariable(targetVariables[i].autoWateringVar);
+        if (specialAutoWatering) {
+            strcpy(wateringStartedFor, targetVarName);
+            if (strcmp(targetVarName, "sHumidity") != 0) {
+                moistureStarted = getSoilMoisture(targetVarName);
+            }
+            wateringStarted = true;
+            break;
+        }
     }
-    int &wSoilMstrMin = Watering::getVariable("wSoilMstrMin");
-    const char* firstPot = "s1";
-    unsigned int firstPotMoisture = getSoilMoisture(firstPot);
-    if (firstPotMoisture < wSoilMstrMin) {
-        strcpy(wateringStartedFor, firstPot);
-        moistureStarted = firstPotMoisture;
-    }
-    const char* secondPot = "s2";
-    unsigned int secondPotMoisture = getSoilMoisture(secondPot);
-    if (secondPotMoisture < wSoilMstrMin) {
-        strcpy(wateringStartedFor, secondPot);
-        moistureStarted = secondPotMoisture;
-    }
-    const char* thirdPot = "s3";
-    unsigned int thirdPotMoisture = getSoilMoisture(thirdPot);
-    if (thirdPotMoisture < wSoilMstrMin) {
-        strcpy(wateringStartedFor, thirdPot);
-        moistureStarted = thirdPotMoisture;
-    }
-    const char* fourthPot = "s4";
-    unsigned int fourthPotMoisture = getSoilMoisture(fourthPot);
-    if (fourthPotMoisture < wSoilMstrMin) {
-        strcpy(wateringStartedFor, fourthPot);
-        moistureStarted = fourthPotMoisture;
-    }
-    if (!Sensor::humidityHasWater()) {
-        strcpy(wateringStartedFor, "sHumidity");
+    if (!wateringStarted) {
+        for (int i = 0; i < varsLen; i++) {
+            char *targetVarName = targetVariables[i].name;
+            double prevWateringSec = getLastTimeWateringForPot(targetVariables[i].lastWateringVar);
+            if (strcmp(targetVarName, "sHumidity") == 0) {
+                if (!Sensor::humidityHasWater()) {
+                    if (prevWateringSec >= waitBetweenWatering) {
+                        strcpy(wateringStartedFor, targetVarName);
+                        wateringStarted = true;
+                        break;
+                    } else {
+                        printLastWateringTime(targetVarName, prevWateringSec);
+                    }
+                }
+            } else {
+                int potSoilMoisture = getSoilMoisture(targetVarName);
+                if (potSoilMoisture < wSoilMstrMin) {
+                    if (prevWateringSec >= waitBetweenWatering) {
+                        strcpy(wateringStartedFor, targetVarName);
+                        moistureStarted = potSoilMoisture;
+                        wateringStarted = true;
+                        break;
+                    } else {
+                        printLastWateringTime(targetVarName, prevWateringSec);
+                    }
+                }
+            }
+        }
     }
 
-    if (
-        strcmp(wateringStartedFor, "s1") == 0
-        || strcmp(wateringStartedFor, "s2") == 0
-        || strcmp(wateringStartedFor, "s3") == 0
-        || strcmp(wateringStartedFor, "s4") == 0
-        || strcmp(wateringStartedFor, "sHumidity") == 0
-    ) {
-        Serial.print("Start watering for: ");
-        Serial.println(wateringStartedFor);
-        if (moistureStarted > 0) {
-            Serial.print("Initial moisture: ");
-            Serial.println(moistureStarted);
-            Serial.print("Minimum must be: ");
-            Serial.println(wSoilMstrMin);
+    if (wateringStarted) {
+        AppBlynk::print("Start watering for: ");
+        AppBlynk::println(wateringStartedFor);
+        if (moistureStarted > 0) { // if watering will be started not for the humidifier
+            AppBlynk::print("Initial moisture: ");
+            AppBlynk::println(moistureStarted);
+            AppBlynk::print("Minimum must be: ");
+            AppBlynk::println(wSoilMstrMin);
         }
-        wateringStarted = true;
     }
 }
 
-void checkProgress() {
+// public
+
+void Watering::setVariable(int *var, const char *key) {
+    int varsLen = *(&intVariables + 1) - intVariables;
+    for (int i = 0; i < varsLen; i++) {
+        if (!intVariables[i].key) {
+            intVariables[i] = WateringIntVariable(var, key);
+            break;
+        }
+    }
+}
+
+void Watering::setVariable(String *var, const char *key) {
+    int varsLen = *(&stringVariables + 1) - stringVariables;
+    for (int i = 0; i < varsLen; i++) {
+        if (!stringVariables[i].key) {
+            stringVariables[i] = WateringStringVariable(var, key);
+            break;
+        }
+    }
+}
+
+void Watering::stop() {
+    Relay::wateringMixingOff();
+    Relay::wateringOff();
+    Relay::wateringCloseValve(wateringStartedFor);
+
+    const int varsLen = *(&targetVariables + 1) - targetVariables;
+    for (int i = 0; i < varsLen; i++) {
+        // save time of last watering for certain pot
+        if (strcmp(wateringStartedFor, targetVariables[i].name) == 0) {
+            String &lastTimeWatering = Watering::getStringVariable(targetVariables[i].lastWateringVar);
+            lastTimeWatering = AppTime::getTimeString(AppTime::getCurrentTime());
+            AppStorage::putString(targetVariables[i].lastWateringVar, lastTimeWatering);
+        }
+        // disable special auto watering to do the watering only once
+        int &specialWateringEnabled = Watering::getIntVariable(targetVariables[i].autoWateringVar);
+        if (specialWateringEnabled) {
+            specialWateringEnabled = 0;
+            AppBlynk::postDataNoCache(targetVariables[i].autoWateringVar, 0);
+        }
+    }
+
+    if (wateringStarted) {
+        AppBlynk::println("Watering stopped!");
+    }
+
+    mixingStarted = false;
+    mixingPassed = false;
+    testWateringStarted = false;
+    testWateringPassed = false;
+    valveIsOpen = false;
+    waitingBeforeMoistureRecheckStarted = false;
+    waitingBeforeMoistureRecheckStartedAt = {0};
+    waitingBeforeMoistureRecheckPassed = false;
+    mainWateringStarted = false;
+    mainWateringStartedAt = {0};
+    mainWateringPassed = false;
+    memset(wateringStartedFor, 0, sizeof wateringStartedFor);
+    moistureStarted = {0};
+    wateringStarted = false;
+}
+
+void Watering::checkProgress() {
+    if (noWaterOrLeakageDetected() || Tools::millisOverflowIsClose()) {
+        Watering::stop();
+        return;
+    }
+    if (!isWateringEnabled() || !wateringStarted) {
+        return;
+    }
     mixing();
     valve();
     testWatering();
@@ -355,24 +419,13 @@ void checkProgress() {
     stopping();
 }
 
-// public
-
-void Watering::setVariable(int *var, const char *key) {
-    int varsLen = *(&variables + 1) - variables;
-    for (int i = 0; i < varsLen; i++) {
-        if (!variables[i].key) {
-            variables[i] = WateringVariable(var, key);
-            break;
-        }
-    }
-}
-
-void Watering::initiate() {
-    timer->setInterval(wateringProgressCheckInterval, checkProgress);
-}
-
 void Watering::check() {
-    if (getVariable("autoWatering") == 1) {
+    if (
+        isWateringEnabled()
+        && !Tools::millisOverflowIsClose()
+        && !wateringStarted
+        && !noWaterOrLeakageDetected()
+    ) {
         soilMoisture();
     }
 }

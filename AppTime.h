@@ -2,7 +2,9 @@
 #define AppTime_h
 
 #include <Arduino.h>
-#include <SimpleTimer.h>
+#include <Time.h>
+
+typedef void (*timer_callback)(void);
 
 struct AppTimeVariable {
     int *var;
@@ -33,7 +35,7 @@ public:
 
     static bool RTCBattery();
 
-    static struct tm RTCGetCurrentTime();
+    static struct tm *RTCGetCurrentTime();
 
     static struct tm getCurrentTime();
 
@@ -42,6 +44,12 @@ public:
     static int getCurrentMinute();
 
     static char *getTimeString(struct tm timeStruct, char format[] = "%02u/%02u/%04u %02u:%02u:%02u");
+
+    static struct tm getTmFromString(const char *value);
+
+    static double compareDates(tm date1, tm date2);
+
+    static double compareDates(String date1, tm date2);
 
     static void print();
 
@@ -55,7 +63,37 @@ public:
 
     static bool lightDayDiapasonMatch(int hour);
 
-    static SimpleTimer *getTimer();
+    static int getOverFlowCounter();
+
+    // maximum number of timers
+    const static int MAX_TIMERS = 16;
+
+    // setTimer() constants
+    const static int RUN_FOREVER = 0;
+    const static int RUN_ONCE = 1;
+
+    // this function must be called inside loop()
+    void run();
+
+    // call function f every d milliseconds
+    int setInterval(long d, timer_callback f);
+
+private:
+    // find the first available slot
+    int findFirstFreeSlot();
+
+    // value returned by the millis() function
+    // in the previous run() call
+    unsigned long prev_millis[MAX_TIMERS];
+
+    // pointers to the callback functions
+    timer_callback callbacks[MAX_TIMERS];
+
+    // delay values
+    long delays[MAX_TIMERS];
+
+    // actual number of timers in use
+    int numTimers;
 };
 
 #endif /* AppTime_h */

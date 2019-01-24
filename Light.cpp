@@ -53,8 +53,8 @@ void Light::setIntensity() {
     int &lightMaxInt = getVariable("lightMaxInt");
     const int currentHour = AppTime::getCurrentHour();
     const int currentMinute = AppTime::getCurrentMinute();
-    int& lightDayStart = AppTime::getLightDayStart();
-    int& lightDayEnd = AppTime::getLightDayEnd();
+    int &lightDayStart = AppTime::getLightDayStart();
+    int &lightDayEnd = AppTime::getLightDayEnd();
     int targetIntensity = 0;
     if (currentHour == lightDayStart) {
         targetIntensity = map(currentMinute, 0, 59, 0, lightMaxInt);

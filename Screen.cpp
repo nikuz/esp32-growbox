@@ -42,7 +42,7 @@ void Screen::sendBuffer() {
     u8g2.sendBuffer();
 }
 
-void Screen::printTemperature(int temperature, int humidity) {
+void Screen::printTemperature(float temperature, float humidity) {
     if (isnan(temperature) || isnan(humidity)) {
         return;
     }
@@ -50,17 +50,22 @@ void Screen::printTemperature(int temperature, int humidity) {
     u8g2.setFont(u8g2_font_crox2cb_tr);
 
     // temperature
-    const String temperatureStr = String(temperature);
-    char temperatureCharStr[temperatureStr.length() + 1];
-    strcpy(temperatureCharStr, temperatureStr.c_str());
+    char temperatureStr[3];
+    dtostrf(temperature, 2, 0, temperatureStr);
     u8g2.setCursor(0, line);
     u8g2.print(temperatureStr);
-    const int temperatureRow = u8g2.getStrWidth(temperatureCharStr);
+    const int temperatureRow = u8g2.getStrWidth(temperatureStr);
     u8g2.drawCircle(temperatureRow + 5, line - 10, 2, U8G2_DRAW_ALL);
 
     // humidity
-    u8g2.setCursor(temperatureRow + 11, line);
-    u8g2.print(" | " + String(humidity) + "%");
+    char humidityStr[3];
+    dtostrf(humidity, 2, 0, humidityStr);
+    const char *separator = " | ";
+    u8g2.drawStr(temperatureRow + 11, line, separator);
+    const int separatorRow = u8g2.getStrWidth(separator);
+    u8g2.drawStr(temperatureRow + 11 + separatorRow, line, humidityStr);
+    const int humidityRow = u8g2.getStrWidth(humidityStr);
+    u8g2.drawStr(temperatureRow + 11 + separatorRow + humidityRow, line, "%");
 }
 
 void Screen::printDayStrip(int currentHour, int lightDayStart, int lightDayEnd) {
@@ -89,12 +94,8 @@ void Screen::printAppVersion() {
     u8g2_uint_t displayWidth = u8g2.getDisplayWidth();
     u8g2_uint_t displayHeight = u8g2.getDisplayHeight();
     u8g2.setFont(u8g2_font_u8glib_4_tf);
-    const String versionStr = VERSION_MARKER + String(VERSION);
-    char versionCharStr[versionStr.length() + 1];
-    strcpy(versionCharStr, versionStr.c_str());
-    u8g2_uint_t versioWidth = u8g2.getStrWidth(versionCharStr);
-    u8g2.setCursor(displayWidth - versioWidth, displayHeight);
-    u8g2.print(versionStr);
+    u8g2.setCursor(displayWidth - 15, displayHeight);
+    u8g2.print(VERSION);
 }
 
 void Screen::printTime(struct tm localtime) {
@@ -110,10 +111,7 @@ void Screen::printUptime() {
 
     u8g2.setFont(u8g2_font_crox2cb_tr);
     u8g2.setCursor(0, displayHeight);
-    const String uptime = Tools::getUptime();
-    char uptimeStr[uptime.length() + 1];
-    strcpy(uptimeStr, uptime.c_str());
-    u8g2.print(uptimeStr);
+    u8g2.print(Tools::getUptime());
 }
 
 void printMarkerWithCircle(char *marker, bool enabled, int line, int margin) {
@@ -145,8 +143,8 @@ void Screen::printWaterLeakage(bool leakageDetected) {
 
 void Screen::refresh() {
     const int currentHour = AppTime::getCurrentHour();
-    int& lightDayStart = AppTime::getLightDayStart();
-    int& lightDayEnd = AppTime::getLightDayEnd();
+    int &lightDayStart = AppTime::getLightDayStart();
+    int &lightDayEnd = AppTime::getLightDayEnd();
 
     clearBuffer();
     printTemperature(Sensor::temperatureGet(), Sensor::humidityGet());
@@ -158,8 +156,8 @@ void Screen::refresh() {
     if (currentHour != -1) {
         printDayStrip(currentHour, lightDayStart, lightDayEnd);
 //        Screen::printTime(AppTime::getCurrentTime());
-        printUptime();
     }
+    printUptime();
 
     sendBuffer();
 }

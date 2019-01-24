@@ -1,13 +1,18 @@
-
 #include <Arduino.h>
 #include <EspOta.h>
-#include <SimpleTimer.h>
 
+#include "def.h"
+
+#ifdef DEBUG
+#define BLYNK_DEBUG // Optional, this enables lots of prints
 #define BLYNK_PRINT Serial
+#endif
+#define BLYNK_NO_BUILTIN   // Disable built-in analog & digital pin operations
+#define BLYNK_NO_FLOAT     // Disable float operations
+#define BLYNK_MSG_LIMIT 50
 
 #include <BlynkSimpleEsp32.h>
 
-#include "def.h"
 #include "AppBlynkDef.h"
 #include "AppBlynk.h"
 #include "AppWiFi.h"
@@ -17,6 +22,7 @@
 #include "Relay.h"
 #include "AppTime.h"
 #include "Light.h"
+#include "Watering.h"
 
 // Blynk virtual pins
 const int pinTemperature = V0;
@@ -48,6 +54,16 @@ const int pinWater = V28;
 const int pinWaterLeakage = V32;
 const int pinLightMaxInt = V26;
 const int pinDoor = V27;
+const int pinS1LstWtrng = V33;
+const int pinS2LstWtrng = V34;
+const int pinS3LstWtrng = V35;
+const int pinS4LstWtrng = V36;
+const int pinHLstWtrng = V37;
+const int pinS1WtrngAuto = V38;
+const int pinS2WtrngAuto = V39;
+const int pinS3WtrngAuto = V40;
+const int pinS4WtrngAuto = V41;
+const int pinHWtrngAuto = V42;
 
 // cache
 int fishIntCache = -1;
@@ -81,17 +97,21 @@ String otaHostCache = "";
 String otaBinCache = "";
 String otaLastUpdateTimeCache = "";
 String uptimeCache = "";
+String s1LstWtrngCache = "";
+String s2LstWtrngCache = "";
+String s3LstWtrngCache = "";
+String s4LstWtrngCache = "";
+String hLstWtrngCache = "";
 
-static SimpleTimer *timer = AppTime::getTimer();
-const int blynkConnectAttemptTime = 5L * 1000L;  // try to connect to blynk server only 5 seconds
-const int checkConnectInterval = 30L * 1000L;  // check blynk connection every 30 seconds
+const unsigned long blynkConnectAttemptTime = 5UL * 1000UL;  // try to connect to blynk server only 5 seconds
+bool blynkConnectAttemptFirstTime = true;
 WidgetTerminal blynkTerminal(V30);
 
 bool noHumidityWaterNotificationSent = false;
 bool noWaterNotificationSent = false;
 bool waterLeakageNotificationSent = false;
 
-static BlynkIntVariable intVariables[10];
+static BlynkIntVariable intVariables[15];
 static BlynkStringVariable stringVariables[10];
 
 AppBlynk::AppBlynk() {};
@@ -130,6 +150,16 @@ int AppBlynk::getPinById(String pinId) {
     if (pinId == "watering") return pinWatering;
     if (pinId == "waterLeakage") return pinWaterLeakage;
     if (pinId == "door") return pinDoor;
+    if (pinId == "s1LstWtrng") return pinS1LstWtrng;
+    if (pinId == "s2LstWtrng") return pinS2LstWtrng;
+    if (pinId == "s3LstWtrng") return pinS3LstWtrng;
+    if (pinId == "s4LstWtrng") return pinS4LstWtrng;
+    if (pinId == "hLstWtrng") return pinHLstWtrng;
+    if (pinId == "s1WtrngAuto") return pinS1WtrngAuto;
+    if (pinId == "s2WtrngAuto") return pinS2WtrngAuto;
+    if (pinId == "s3WtrngAuto") return pinS3WtrngAuto;
+    if (pinId == "s4WtrngAuto") return pinS4WtrngAuto;
+    if (pinId == "hWtrngAuto") return pinHWtrngAuto;
 
     return -1;
 }
@@ -168,6 +198,11 @@ String &AppBlynk::getStringCacheValue(String pinId) {
     if (pinId == "otaBin") return otaBinCache;
     if (pinId == "otaLastUpdateTime") return otaLastUpdateTimeCache;
     if (pinId == "uptime") return uptimeCache;
+    if (pinId == "s1LstWtrng") return s1LstWtrngCache;
+    if (pinId == "s2LstWtrng") return s2LstWtrngCache;
+    if (pinId == "s3LstWtrng") return s3LstWtrngCache;
+    if (pinId == "s4LstWtrng") return s4LstWtrngCache;
+    if (pinId == "hLstWtrng") return hLstWtrngCache;
 
     return fishStringCache;
 }
@@ -195,25 +230,28 @@ String &AppBlynk::getStringVariable(const char *pin) {
 }
 
 void AppBlynk::sync() { // every 60 sec
-    if (!AppWiFi::isConnected() || !Blynk.connected()) {
+    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
         return;
     }
-	const char* otaHostPin = "otaHost";
-	String& otaHostVariable = AppBlynk::getStringVariable(otaHostPin);
-    AppBlynk::postData("otaHost", otaHostVariable);
-    const char* otaBinPin = "otaBin";
-    String& otaBinVariable = AppBlynk::getStringVariable(otaBinPin);
-	AppBlynk::postData("otaBin", otaBinVariable);
-    AppBlynk::postData("otaLastUpdateTime", EspOta::getUpdateTime());
 
-    AppBlynk::postData("uptime", Tools::getUptime());
-    AppBlynk::postData("version", VERSION_MARKER + String(VERSION));
+    const char *otaHostPin = "otaHost";
+    String &otaHostVariable = AppBlynk::getStringVariable(otaHostPin);
+    AppBlynk::postData("otaHost", otaHostVariable);
+
+    const char *otaBinPin = "otaBin";
+    String &otaBinVariable = AppBlynk::getStringVariable(otaBinPin);
+    AppBlynk::postData("otaBin", otaBinVariable);
+
+    AppBlynk::postData("otaLastUpdateTime", EspOta::getUpdateTime());
+    AppBlynk::postData("uptime", String(Tools::getUptime()));
+    AppBlynk::postData("version", VERSION);
 }
 
-void AppBlynk::syncHighFreq() { // every 2 sec
-    if (!AppWiFi::isConnected() || !Blynk.connected()) {
+void AppBlynk::syncHighFreq1() { // every 3 sec
+    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
         return;
     }
+
     AppBlynk::postData("temperature", Sensor::temperatureGet());
     AppBlynk::postData("humidity", Sensor::humidityGet());
     AppBlynk::postData("light", Relay::isLightOn() ? 255 : 0);
@@ -222,15 +260,6 @@ void AppBlynk::syncHighFreq() { // every 2 sec
     AppBlynk::postData("rtcBattery", AppTime::RTCBattery() ? 255 : 0);
     AppBlynk::postData("rtcTemperature", AppTime::RTCGetTemperature());
     AppBlynk::postData("humidityWater", Sensor::humidityHasWater() ? 255 : 0);
-    AppBlynk::postData("soilMoisture1", Sensor::getSoilMoisture(SOIL_SENSOR_1, SOIL_SENSOR_1_MIN, SOIL_SENSOR_1_MAX));
-    AppBlynk::postData("soilMoisture2", Sensor::getSoilMoisture(SOIL_SENSOR_2, SOIL_SENSOR_2_MIN, SOIL_SENSOR_2_MAX));
-    AppBlynk::postData("soilMoisture3", Sensor::getSoilMoisture(SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX));
-    AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX));
-    AppBlynk::postData("watering", Relay::isWateringOn() ? 255 : 0);
-    AppBlynk::postData("water", Sensor::wateringHasWater() ? 255 : 0);
-    AppBlynk::postData("waterLeakage", Sensor::waterLeakageDetected() ? 255 : 0);
-    AppBlynk::postData("lightIntensity", Light::intensity());
-    AppBlynk::postData("door", Sensor::doorIsOpen() ? 0 : 255);
 
 #if PRODUCTION
     bool humidityHasWater = Sensor::humidityHasWater();
@@ -250,59 +279,122 @@ void AppBlynk::syncHighFreq() { // every 2 sec
     }
 
     bool waterLeakage = Sensor::waterLeakageDetected();
-    if (!waterLeakage && !waterLeakageNotificationSent) {
+    if (waterLeakage && !waterLeakageNotificationSent) {
         Blynk.notify("Water leakage detected!!!");
         waterLeakageNotificationSent = true;
-    } else if (waterLeakage && waterLeakageNotificationSent) {
+    } else if (!waterLeakage && waterLeakageNotificationSent) {
         waterLeakageNotificationSent = false;
     }
 #endif
 }
 
+void AppBlynk::syncHighFreq2() { // every 4 sec
+    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
+        return;
+    }
+
+    AppBlynk::postData("soilMoisture1", Sensor::getSoilMoisture(SOIL_SENSOR_1));
+    AppBlynk::postData("soilMoisture2", Sensor::getSoilMoisture(SOIL_SENSOR_2));
+    AppBlynk::postData("soilMoisture3", Sensor::getSoilMoisture(SOIL_SENSOR_3));
+    AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4));
+    AppBlynk::postData("watering", Relay::isWateringOn() ? 255 : 0);
+    AppBlynk::postData("water", Sensor::wateringHasWater() ? 255 : 0);
+    AppBlynk::postData("waterLeakage", Sensor::waterLeakageDetected() ? 255 : 0);
+    AppBlynk::postData("lightIntensity", Light::intensity());
+    AppBlynk::postData("door", Sensor::doorIsOpen() ? 0 : 255);
+}
+
+void AppBlynk::syncHighFreq3() { // every 5 sec
+    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
+        return;
+    }
+
+    AppBlynk::postData("s1LstWtrng", Watering::getStringVariable("s1LstWtrng"));
+    AppBlynk::postData("s2LstWtrng", Watering::getStringVariable("s2LstWtrng"));
+    AppBlynk::postData("s3LstWtrng", Watering::getStringVariable("s3LstWtrng"));
+    AppBlynk::postData("s4LstWtrng", Watering::getStringVariable("s4LstWtrng"));
+    AppBlynk::postData("hLstWtrng", Watering::getStringVariable("hLstWtrng"));
+}
+
+void writeHandler(const char *pin, int value, bool store) {
+    int &variable = AppBlynk::getIntVariable(pin);
+    AppBlynk::getData(variable, pin, value, store);
+}
+
+void writeHandler(const char *pin, String value, bool store) {
+    String &variable = AppBlynk::getStringVariable(pin);
+    AppBlynk::getData(variable, pin, value, store);
+}
+
 BLYNK_WRITE(V6) { // lightDayStart
-    const char* pin = "lightDayStart";
-    int& variable = AppBlynk::getIntVariable(pin);
-    AppBlynk::getData(variable, pin, param.asInt(), true);
+    writeHandler("lightDayStart", param.asInt(), true);
 }
 BLYNK_WRITE(V7) { // lightDayEnd
-    const char* pin = "lightDayEnd";
-    int& variable = AppBlynk::getIntVariable(pin);
-    AppBlynk::getData(variable, pin, param.asInt(), true);
+    writeHandler("lightDayEnd", param.asInt(), true);
 }
 BLYNK_WRITE(V8) { // ventTempMax
-    const char* pin = "ventTempMax";
-    int& variable = AppBlynk::getIntVariable(pin);
-    AppBlynk::getData(variable, pin, param.asInt(), true);
+    writeHandler("ventTempMax", param.asInt(), true);
 }
 BLYNK_WRITE(V14) { // ventHumMax
-    const char* pin = "ventHumMax";
-    int& variable = AppBlynk::getIntVariable(pin);
-    AppBlynk::getData(variable, pin, param.asInt(), true);
+    writeHandler("ventHumMax", param.asInt(), true);
 }
 BLYNK_WRITE(V20) { // otaHost
-    const char* pin = "otaHost";
-    String& variable = AppBlynk::getStringVariable(pin);
-    AppBlynk::getData(variable, pin, param.asStr(), true);
+    writeHandler("otaHost", param.asStr(), true);
 }
 BLYNK_WRITE(V21) { // otaBin
-    const char* pin = "otaBin";
-    String& variable = AppBlynk::getStringVariable(pin);
-    AppBlynk::getData(variable, pin, param.asStr(), true);
+    writeHandler("otaBin", param.asStr(), true);
 }
 BLYNK_WRITE(V23) { // wSoilMstrMin
-    const char* pin = "wSoilMstrMin";
-    int& variable = AppBlynk::getIntVariable(pin);
-    AppBlynk::getData(variable, pin, param.asInt(), true);
+    writeHandler("wSoilMstrMin", param.asInt(), true);
 }
 BLYNK_WRITE(V26) { // lightMaxInt
-    const char* pin = "lightMaxInt";
-    int& variable = AppBlynk::getIntVariable(pin);
-    AppBlynk::getData(variable, pin, param.asInt(), true);
+    writeHandler("lightMaxInt", param.asInt(), true);
 }
 BLYNK_WRITE(V29) { // autoWatering
-    const char* pin = "autoWatering";
-    int& variable = AppBlynk::getIntVariable(pin);
-    variable = param.asInt();
+    int value = param.asInt();
+    if (value == 0) {
+        Watering::stop();
+    }
+    writeHandler("autoWatering", value, false);
+}
+BLYNK_WRITE(V38) {
+    int value = param.asInt();
+    if (value == 0) {
+        Watering::stop();
+    }
+    writeHandler("s1WtrngAuto", value, false);
+}
+
+BLYNK_WRITE(V39) {
+    int value = param.asInt();
+    if (value == 0) {
+        Watering::stop();
+    }
+    writeHandler("s2WtrngAuto", value, false);
+}
+
+BLYNK_WRITE(V40) {
+    int value = param.asInt();
+    if (value == 0) {
+        Watering::stop();
+    }
+    writeHandler("s3WtrngAuto", value, false);
+}
+
+BLYNK_WRITE(V41) {
+    int value = param.asInt();
+    if (value == 0) {
+        Watering::stop();
+    }
+    writeHandler("s4WtrngAuto", value, false);
+}
+
+BLYNK_WRITE(V42) {
+    int value = param.asInt();
+    if (value == 0) {
+        Watering::stop();
+    }
+    writeHandler("hWtrngAuto", value, false);
 }
 BLYNK_WRITE(V10) { // ping
     if (param.asInt() == 1) {
@@ -328,19 +420,6 @@ BLYNK_CONNECTED() {
     Blynk.syncAll();
 }
 
-void checkConnect() {
-	if (AppWiFi::isConnected() && !Blynk.connected()) {
-		unsigned long startConnecting = millis();
-		while (!Blynk.connected()) {
-			Blynk.connect();
-			if (millis() > startConnecting + blynkConnectAttemptTime) {
-				Serial.println("Unable to connect to Blynk server.\n");
-				break;
-			}
-		}
-	}
-}
-
 // public
 
 void AppBlynk::setVariable(int *var, const char *pin, bool store) {
@@ -363,19 +442,36 @@ void AppBlynk::setVariable(String *var, const char *pin, bool store) {
     }
 }
 
+void AppBlynk::checkConnect() {
+    if (!blynkConnectAttemptFirstTime && Tools::millisOverflowIsClose()) {
+        return;
+    }
+    if (AppWiFi::isConnected() && !Blynk.connected()) {
+        unsigned long startConnecting = millis();
+        while (!Blynk.connected()) {
+            Blynk.connect();
+            if (millis() > startConnecting + blynkConnectAttemptTime) {
+                Serial.println("Unable to connect to Blynk server.\n");
+                break;
+            }
+        }
+        if (Blynk.connected() && blynkConnectAttemptFirstTime) {
+            blynkTerminal.clear();
+            sync();
+        }
+        blynkConnectAttemptFirstTime = false;
+    }
+}
+
 void AppBlynk::initiate() {
     Blynk.config(blynkAuth, blynkDomain, blynkPort);
-    checkConnect();
-    blynkTerminal.clear();
-    sync();
-    Blynk.notify("Blynk Dev instance initiate");
-    timer->setInterval(checkConnectInterval, checkConnect);
+    AppBlynk::checkConnect();
 }
 
 void AppBlynk::run() {
-	if (Blynk.connected()) {
-		Blynk.run();
-	}
+    if (Blynk.connected()) {
+        Blynk.run();
+    }
 }
 
 void AppBlynk::getData(int &localVariable, const char *pinId, int pinData, const bool storePreferences) {
@@ -391,7 +487,7 @@ void AppBlynk::getData(int &localVariable, const char *pinId, int pinData, const
     }
 }
 
-void AppBlynk::getData(String &localVariable, const char *pinId, String pinData, bool storePreferences) {
+void AppBlynk::getData(String &localVariable, const char *pinId, String pinData, const bool storePreferences) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (localVariable == "fish" || blynkPin == -1) {
         return;
@@ -411,7 +507,9 @@ void AppBlynk::postData(String pinId, int value) {
     }
     int &cacheValue = AppBlynk::getIntCacheValue(pinId);
     if (cacheValue != -1 || cacheValue != value) { // post data also if cache not applied for pin
-        Blynk.virtualWrite(blynkPin, value);
+        if (Blynk.connected()) {
+            Blynk.virtualWrite(blynkPin, value);
+        }
         cacheValue = value;
     }
 }
@@ -423,13 +521,89 @@ void AppBlynk::postData(String pinId, String value) {
     }
     String &cacheValue = AppBlynk::getStringCacheValue(pinId);
     if (cacheValue != "fish" || cacheValue != value) { // post data also if cache not applied for pin
-        Blynk.virtualWrite(blynkPin, value);
+        if (Blynk.connected()) {
+            Blynk.virtualWrite(blynkPin, value);
+        }
         cacheValue = value;
     }
 }
 
-void AppBlynk::terminal(String value) {
+void AppBlynk::postDataNoCache(String pinId, int value) {
+    int blynkPin = AppBlynk::getPinById(pinId);
+    if (blynkPin == -1) {
+        return;
+    }
+    if (Blynk.connected()) {
+        Blynk.virtualWrite(blynkPin, value);
+    }
+}
+
+void AppBlynk::postDataNoCache(String pinId, String value) {
+    int blynkPin = AppBlynk::getPinById(pinId);
+    if (blynkPin == -1) {
+        return;
+    }
+    if (Blynk.connected()) {
+        Blynk.virtualWrite(blynkPin, value);
+    }
+}
+
+void AppBlynk::print(String value) {
     Serial.print(value);
-    blynkTerminal.println(value);
-    blynkTerminal.flush();
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.print(value);
+    }
+}
+
+void AppBlynk::print(char *value) {
+    Serial.print(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.print(value);
+    }
+}
+
+void AppBlynk::print(int value) {
+    Serial.print(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.print(value);
+    }
+}
+
+void AppBlynk::print(double value) {
+    Serial.print(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.print(value);
+    }
+}
+
+void AppBlynk::println(String value) {
+    Serial.println(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.print(value);
+        blynkTerminal.flush();
+    }
+}
+
+void AppBlynk::println(char *value) {
+    Serial.println(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.println(value);
+        blynkTerminal.flush();
+    }
+}
+
+void AppBlynk::println(int value) {
+    Serial.println(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.println(value);
+        blynkTerminal.flush();
+    }
+}
+
+void AppBlynk::println(double value) {
+    Serial.println(value);
+    if (AppWiFi::isConnected() && Blynk.connected() && !Tools::millisOverflowIsClose()) {
+        blynkTerminal.println(value);
+        blynkTerminal.flush();
+    }
 }

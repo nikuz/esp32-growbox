@@ -10,16 +10,22 @@ bool humidityWater = false;
 bool wateringWater = false;
 bool doorOpened = false;
 unsigned int soilMoisture[4] = {
-        0,
-        0,
-        0,
-        0,
+    0,
+    0,
+    0,
+    0,
+};
+static SoilMoistureSensor soilMoistureSensors[] = {
+    {SOIL_SENSOR_1, SOIL_SENSOR_1_MIN, SOIL_SENSOR_1_MAX},
+    {SOIL_SENSOR_2, SOIL_SENSOR_2_MIN, SOIL_SENSOR_2_MAX},
+    {SOIL_SENSOR_3, SOIL_SENSOR_3_MIN, SOIL_SENSOR_3_MAX},
+    {SOIL_SENSOR_4, SOIL_SENSOR_4_MIN, SOIL_SENSOR_4_MAX},
 };
 unsigned int rainSensors[4] = {
-        0,
-        0,
-        0,
-        0,
+    0,
+    0,
+    0,
+    0,
 };
 
 Sensor::Sensor() {}
@@ -35,7 +41,7 @@ void Sensor::parseSerialCommand(const char *command, const char *param) {
         currentHumidity = value;
     }
     if (strcmp(command, "humw") == 0) {
-    	humidityWater = value == 1;
+        humidityWater = value == 1;
     }
     if (strcmp(command, "water") == 0) {
         wateringWater = value == 1;
@@ -102,21 +108,24 @@ bool Sensor::humidityLessThan(int minValue) {
 }
 
 bool Sensor::humidityHasWater() {
-	return true;
-//    return humidityWater;
+    return humidityWater;
 }
 
 // soil moisture
 
-unsigned int Sensor::getSoilMoisture(int sensorId, int min, int max) {
+int Sensor::getSoilMoisture(int sensorId) {
     int value = soilMoisture[sensorId - 1];
-
     if (value) {
-        value = map(value, min, max, 0, 100);
-        if (value < 0) {
-            value = 0;
-        } else if (value > 100) {
-            value = 100;
+        const int varsLen = *(&soilMoistureSensors + 1) - soilMoistureSensors;
+        for (int i = 0; i < varsLen; i++) {
+            if (soilMoistureSensors[i].sensorId == sensorId) {
+                value = map(value, soilMoistureSensors[i].min, soilMoistureSensors[i].max, 0, 100);
+                if (value < 0) {
+                    value = 0;
+                } else if (value > 100) {
+                    value = 100;
+                }
+            }
         }
     }
 
