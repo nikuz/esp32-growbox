@@ -1,8 +1,8 @@
 #define PRODUCTION 1    // production
 //#define PRODUCTION 0    // development
-#define DEBUG 1
+//#define DEBUG 1
 
-#define VERSION_ID "47"
+#define VERSION_ID "49"
 
 #if PRODUCTION
 #define VERSION_MARKER "P"
@@ -13,7 +13,7 @@
 #define VERSION VERSION_MARKER VERSION_ID
 
 #ifdef DEBUG
-#define DEBUG_PRINT(x)  Serial.print(x)
+#define DEBUG_PRINT(x)    Serial.print(x)
 #define DEBUG_PRINTLN(x)  Serial.println(x)
 #else
 #define DEBUG_PRINT(x)

@@ -76,12 +76,13 @@ public:
     void run();
 
     // call function f every d milliseconds
-    int setInterval(long d, timer_callback f);
+    int setInterval(char * name, long d, timer_callback f);
 
 private:
     // find the first available slot
     int findFirstFreeSlot();
 
+    char *names[MAX_TIMERS];
     // value returned by the millis() function
     // in the previous run() call
     unsigned long prev_millis[MAX_TIMERS];

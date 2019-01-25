@@ -64,10 +64,10 @@ char *Tools::stringReplace(char *str, char *find, char *replace) {
 }
 
 bool Tools::millisOverflowIsClose() {
-    static const unsigned long millisOverflow = 4294967;
+    static const unsigned long millisOverflow = 4294967295;
     static const unsigned long overflowFreeTime = 10UL * 1000UL; // ten seconds before and after overflow do nothing
     const unsigned long t = millis();
 
-    return t < overflowFreeTime || t > millisOverflow - overflowFreeTime;
+    return t <= millisOverflow && (t < overflowFreeTime || t > millisOverflow - overflowFreeTime);
 }
 

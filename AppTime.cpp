@@ -50,6 +50,7 @@ AppTime::AppTime() {
         callbacks[i] = 0;                   // if the callback pointer is zero, the slot is free, i.e. doesn't "contain" any timer
         prev_millis[i] = current_millis;
         delays[i] = 0;
+        names[i] = "";
     }
 
     numTimers = 0;
@@ -274,6 +275,8 @@ void AppTime::run() {
             if (current_millis - prev_millis[i] >= delays[i]) {
                 // update time
                 prev_millis[i] = current_millis;
+                DEBUG_PRINT("Run timer: ");
+                DEBUG_PRINTLN(names[i]);
                 (*callbacks[i])();
             }
         }
@@ -301,7 +304,7 @@ int AppTime::findFirstFreeSlot() {
     return -1;
 }
 
-int AppTime::setInterval(long d, timer_callback f) {
+int AppTime::setInterval(char *name, long d, timer_callback f) {
     int freeTimer;
 
     freeTimer = findFirstFreeSlot();
@@ -313,6 +316,7 @@ int AppTime::setInterval(long d, timer_callback f) {
         return -1;
     }
 
+    names[freeTimer] = name;
     delays[freeTimer] = d;
     callbacks[freeTimer] = f;
     prev_millis[freeTimer] = elapsed();

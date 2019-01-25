@@ -113,6 +113,36 @@ bool waterLeakageNotificationSent = false;
 
 static BlynkIntVariable intVariables[15];
 static BlynkStringVariable stringVariables[10];
+static BlynkSyncVariable syncVariables[] = {
+    {"otaHost",           false},
+    {"otaBin",            false},
+    {"otaLastUpdateTime", false},
+    {"uptime",            false},
+    {"version",           false},
+    {"temperature",       false},
+    {"humidity",          false},
+    {"light",             false},
+    {"ventilation",       false},
+    {"wind",              false},
+    {"rtcBattery",        false},
+    {"rtcTemperature",    false},
+    {"humidityWater",     false},
+    {"soilMoisture1",     false},
+    {"soilMoisture2",     false},
+    {"soilMoisture3",     false},
+    {"soilMoisture4",     false},
+    {"watering",          false},
+    {"water",             false},
+    {"waterLeakage",      false},
+    {"lightIntensity",    false},
+    {"door",              false},
+    {"s1LstWtrng",        false},
+    {"s2LstWtrng",        false},
+    {"s3LstWtrng",        false},
+    {"s4LstWtrng",        false},
+    {"hLstWtrng",         false},
+};
+const int syncValuesPerSecond = 5;
 
 AppBlynk::AppBlynk() {};
 
@@ -120,89 +150,89 @@ AppBlynk::~AppBlynk() {};
 
 // private
 
-int AppBlynk::getPinById(String pinId) {
-    if (pinId == "temperature") return pinTemperature;
-    if (pinId == "humidity") return pinHumidity;
-    if (pinId == "light") return pinLight;
-    if (pinId == "lightIntensity") return pinLightIntensity;
-    if (pinId == "lightMaxInt") return pinLightMaxInt;
-    if (pinId == "lightDayStart") return pinLightDayStart;
-    if (pinId == "lightDayEnd") return pinLightDayEnd;
-    if (pinId == "ventilation") return pinVentilation;
-    if (pinId == "wind") return pinWind;
-    if (pinId == "ventTempMax") return pinVentilationTemperatureMax;
-    if (pinId == "ventHumMax") return pinVentilationHumidityMax;
-    if (pinId == "version") return pinVersion;
-    if (pinId == "rtcBattery") return pinRtcBattery;
-    if (pinId == "otaHost") return pinOtaHost;
-    if (pinId == "otaBin") return pinOtaBin;
-    if (pinId == "otaLastUpdateTime") return pinOtaLastUpdateTime;
-    if (pinId == "uptime") return pinUptime;
-    if (pinId == "rtcTemperature") return pinRtcTemperature;
-    if (pinId == "humidityWater") return pinHumidityWater;
-    if (pinId == "soilMoisture1") return pinSoilMoisture1;
-    if (pinId == "soilMoisture2") return pinSoilMoisture2;
-    if (pinId == "soilMoisture3") return pinSoilMoisture3;
-    if (pinId == "soilMoisture4") return pinSoilMoisture4;
-    if (pinId == "wSoilMstrMin") return pinWSoilMstrMin;
-    if (pinId == "water") return pinWater;
-    if (pinId == "autoWatering") return pinAutoWatering;
-    if (pinId == "watering") return pinWatering;
-    if (pinId == "waterLeakage") return pinWaterLeakage;
-    if (pinId == "door") return pinDoor;
-    if (pinId == "s1LstWtrng") return pinS1LstWtrng;
-    if (pinId == "s2LstWtrng") return pinS2LstWtrng;
-    if (pinId == "s3LstWtrng") return pinS3LstWtrng;
-    if (pinId == "s4LstWtrng") return pinS4LstWtrng;
-    if (pinId == "hLstWtrng") return pinHLstWtrng;
-    if (pinId == "s1WtrngAuto") return pinS1WtrngAuto;
-    if (pinId == "s2WtrngAuto") return pinS2WtrngAuto;
-    if (pinId == "s3WtrngAuto") return pinS3WtrngAuto;
-    if (pinId == "s4WtrngAuto") return pinS4WtrngAuto;
-    if (pinId == "hWtrngAuto") return pinHWtrngAuto;
+int AppBlynk::getPinById(const char *pinId) {
+    if (strcmp(pinId, "temperature") == 0) return pinTemperature;
+    if (strcmp(pinId, "humidity") == 0) return pinHumidity;
+    if (strcmp(pinId, "light") == 0) return pinLight;
+    if (strcmp(pinId, "lightIntensity") == 0) return pinLightIntensity;
+    if (strcmp(pinId, "lightMaxInt") == 0) return pinLightMaxInt;
+    if (strcmp(pinId, "lightDayStart") == 0) return pinLightDayStart;
+    if (strcmp(pinId, "lightDayEnd") == 0) return pinLightDayEnd;
+    if (strcmp(pinId, "ventilation") == 0) return pinVentilation;
+    if (strcmp(pinId, "wind") == 0) return pinWind;
+    if (strcmp(pinId, "ventTempMax") == 0) return pinVentilationTemperatureMax;
+    if (strcmp(pinId, "ventHumMax") == 0) return pinVentilationHumidityMax;
+    if (strcmp(pinId, "version") == 0) return pinVersion;
+    if (strcmp(pinId, "rtcBattery") == 0) return pinRtcBattery;
+    if (strcmp(pinId, "otaHost") == 0) return pinOtaHost;
+    if (strcmp(pinId, "otaBin") == 0) return pinOtaBin;
+    if (strcmp(pinId, "otaLastUpdateTime") == 0) return pinOtaLastUpdateTime;
+    if (strcmp(pinId, "uptime") == 0) return pinUptime;
+    if (strcmp(pinId, "rtcTemperature") == 0) return pinRtcTemperature;
+    if (strcmp(pinId, "humidityWater") == 0) return pinHumidityWater;
+    if (strcmp(pinId, "soilMoisture1") == 0) return pinSoilMoisture1;
+    if (strcmp(pinId, "soilMoisture2") == 0) return pinSoilMoisture2;
+    if (strcmp(pinId, "soilMoisture3") == 0) return pinSoilMoisture3;
+    if (strcmp(pinId, "soilMoisture4") == 0) return pinSoilMoisture4;
+    if (strcmp(pinId, "wSoilMstrMin") == 0) return pinWSoilMstrMin;
+    if (strcmp(pinId, "water") == 0) return pinWater;
+    if (strcmp(pinId, "autoWatering") == 0) return pinAutoWatering;
+    if (strcmp(pinId, "watering") == 0) return pinWatering;
+    if (strcmp(pinId, "waterLeakage") == 0) return pinWaterLeakage;
+    if (strcmp(pinId, "door") == 0) return pinDoor;
+    if (strcmp(pinId, "s1LstWtrng") == 0) return pinS1LstWtrng;
+    if (strcmp(pinId, "s2LstWtrng") == 0) return pinS2LstWtrng;
+    if (strcmp(pinId, "s3LstWtrng") == 0) return pinS3LstWtrng;
+    if (strcmp(pinId, "s4LstWtrng") == 0) return pinS4LstWtrng;
+    if (strcmp(pinId, "hLstWtrng") == 0) return pinHLstWtrng;
+    if (strcmp(pinId, "s1WtrngAuto") == 0) return pinS1WtrngAuto;
+    if (strcmp(pinId, "s2WtrngAuto") == 0) return pinS2WtrngAuto;
+    if (strcmp(pinId, "s3WtrngAuto") == 0) return pinS3WtrngAuto;
+    if (strcmp(pinId, "s4WtrngAuto") == 0) return pinS4WtrngAuto;
+    if (strcmp(pinId, "hWtrngAuto") == 0) return pinHWtrngAuto;
 
     return -1;
 }
 
-int &AppBlynk::getIntCacheValue(String pinId) {
-    if (pinId == "temperature") return temperatureCache;
-    if (pinId == "humidity") return humidityCache;
-    if (pinId == "light") return lightCache;
-    if (pinId == "lightIntensity") return lightIntensityCache;
-    if (pinId == "lightDayStart") return lightDayStartCache;
-    if (pinId == "lightDayEnd") return lightDayEndCache;
-    if (pinId == "ventilation") return ventilationCache;
-    if (pinId == "wind") return windCache;
-    if (pinId == "ventTempMax") return ventilationTemperatureMaxCache;
-    if (pinId == "ventHumMax") return ventilationHumidityMaxCache;
-    if (pinId == "version") return versionCache;
-    if (pinId == "rtcBattery") return rtcBatteryCache;
-    if (pinId == "rtcTemperature") return rtcTemperatureCache;
-    if (pinId == "humidityWater") return humidityWaterCache;
-    if (pinId == "soilMoisture1") return soilMoistureCache1;
-    if (pinId == "soilMoisture2") return soilMoistureCache2;
-    if (pinId == "soilMoisture3") return soilMoistureCache3;
-    if (pinId == "soilMoisture4") return soilMoistureCache4;
-    if (pinId == "wSoilMstrMin") return wSoilMstrMinCache;
-    if (pinId == "autoWatering") return autoWateringCache;
-    if (pinId == "watering") return wateringCache;
-    if (pinId == "water") return waterCache;
-    if (pinId == "waterLeakage") return pinWaterLeakageCache;
-    if (pinId == "door") return doorCache;
+int &AppBlynk::getIntCacheValue(const char *pinId) {
+    if (strcmp(pinId, "temperature") == 0) return temperatureCache;
+    if (strcmp(pinId, "humidity") == 0) return humidityCache;
+    if (strcmp(pinId, "light") == 0) return lightCache;
+    if (strcmp(pinId, "lightIntensity") == 0) return lightIntensityCache;
+    if (strcmp(pinId, "lightDayStart") == 0) return lightDayStartCache;
+    if (strcmp(pinId, "lightDayEnd") == 0) return lightDayEndCache;
+    if (strcmp(pinId, "ventilation") == 0) return ventilationCache;
+    if (strcmp(pinId, "wind") == 0) return windCache;
+    if (strcmp(pinId, "ventTempMax") == 0) return ventilationTemperatureMaxCache;
+    if (strcmp(pinId, "ventHumMax") == 0) return ventilationHumidityMaxCache;
+    if (strcmp(pinId, "version") == 0) return versionCache;
+    if (strcmp(pinId, "rtcBattery") == 0) return rtcBatteryCache;
+    if (strcmp(pinId, "rtcTemperature") == 0) return rtcTemperatureCache;
+    if (strcmp(pinId, "humidityWater") == 0) return humidityWaterCache;
+    if (strcmp(pinId, "soilMoisture1") == 0) return soilMoistureCache1;
+    if (strcmp(pinId, "soilMoisture2") == 0) return soilMoistureCache2;
+    if (strcmp(pinId, "soilMoisture3") == 0) return soilMoistureCache3;
+    if (strcmp(pinId, "soilMoisture4") == 0) return soilMoistureCache4;
+    if (strcmp(pinId, "wSoilMstrMin") == 0) return wSoilMstrMinCache;
+    if (strcmp(pinId, "autoWatering") == 0) return autoWateringCache;
+    if (strcmp(pinId, "watering") == 0) return wateringCache;
+    if (strcmp(pinId, "water") == 0) return waterCache;
+    if (strcmp(pinId, "waterLeakage") == 0) return pinWaterLeakageCache;
+    if (strcmp(pinId, "door") == 0) return doorCache;
 
     return fishIntCache;
 }
 
-String &AppBlynk::getStringCacheValue(String pinId) {
-    if (pinId == "otaHost") return otaHostCache;
-    if (pinId == "otaBin") return otaBinCache;
-    if (pinId == "otaLastUpdateTime") return otaLastUpdateTimeCache;
-    if (pinId == "uptime") return uptimeCache;
-    if (pinId == "s1LstWtrng") return s1LstWtrngCache;
-    if (pinId == "s2LstWtrng") return s2LstWtrngCache;
-    if (pinId == "s3LstWtrng") return s3LstWtrngCache;
-    if (pinId == "s4LstWtrng") return s4LstWtrngCache;
-    if (pinId == "hLstWtrng") return hLstWtrngCache;
+String &AppBlynk::getStringCacheValue(const char *pinId) {
+    if (strcmp(pinId, "otaHost") == 0) return otaHostCache;
+    if (strcmp(pinId, "otaBin") == 0) return otaBinCache;
+    if (strcmp(pinId, "otaLastUpdateTime") == 0) return otaLastUpdateTimeCache;
+    if (strcmp(pinId, "uptime") == 0) return uptimeCache;
+    if (strcmp(pinId, "s1LstWtrng") == 0) return s1LstWtrngCache;
+    if (strcmp(pinId, "s2LstWtrng") == 0) return s2LstWtrngCache;
+    if (strcmp(pinId, "s3LstWtrng") == 0) return s3LstWtrngCache;
+    if (strcmp(pinId, "s4LstWtrng") == 0) return s4LstWtrngCache;
+    if (strcmp(pinId, "hLstWtrng") == 0) return hLstWtrngCache;
 
     return fishStringCache;
 }
@@ -229,37 +259,127 @@ String &AppBlynk::getStringVariable(const char *pin) {
     return fishStringCache;
 }
 
-void AppBlynk::sync() { // every 60 sec
+void AppBlynk::sync() { // every second
+    DEBUG_PRINTLN("Check connect:");
+    DEBUG_PRINT("Wifi connected: ");
+    DEBUG_PRINTLN(AppWiFi::isConnected());
+    DEBUG_PRINT("Blynk connected: ");
+    DEBUG_PRINTLN(Blynk.connected());
+    DEBUG_PRINT("Millis: ");
+    DEBUG_PRINTLN(millis());
+    DEBUG_PRINT("Overflow is close: ");
+    DEBUG_PRINTLN(Tools::millisOverflowIsClose());
     if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
         return;
     }
 
-    const char *otaHostPin = "otaHost";
-    String &otaHostVariable = AppBlynk::getStringVariable(otaHostPin);
-    AppBlynk::postData("otaHost", otaHostVariable);
+    int syncCounter = 0;
+    const int varsLen = *(&syncVariables + 1) - syncVariables;
+    DEBUG_PRINT("Vars to sync: ");
+    DEBUG_PRINTLN(varsLen);
+    for (int i = 0; i < varsLen; i++) {
+        if (syncCounter < syncValuesPerSecond) {
+            if (syncVariables[i].synced) {
+                continue;
+            }
 
-    const char *otaBinPin = "otaBin";
-    String &otaBinVariable = AppBlynk::getStringVariable(otaBinPin);
-    AppBlynk::postData("otaBin", otaBinVariable);
-
-    AppBlynk::postData("otaLastUpdateTime", EspOta::getUpdateTime());
-    AppBlynk::postData("uptime", String(Tools::getUptime()));
-    AppBlynk::postData("version", VERSION);
-}
-
-void AppBlynk::syncHighFreq1() { // every 3 sec
-    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
-        return;
+            const char *pin = syncVariables[i].pin;
+            DEBUG_PRINT("Sync pin: ");
+            DEBUG_PRINT(pin);
+            DEBUG_PRINT(": ");
+            if (strcmp(pin, "otaHost") == 0) {
+                String &otaHostVariable = AppBlynk::getStringVariable(pin);
+                AppBlynk::postData(pin, otaHostVariable);
+            };
+            if (strcmp(pin, "otaBin") == 0) {
+                String &otaBinVariable = AppBlynk::getStringVariable(pin);
+                AppBlynk::postData(pin, otaBinVariable);
+            };
+            if (strcmp(pin, "otaLastUpdateTime") == 0) {
+                AppBlynk::postData(pin, EspOta::getUpdateTime());
+            };
+            if (strcmp(pin, "uptime") == 0) {
+                AppBlynk::postData(pin, String(Tools::getUptime()));
+            };
+            if (strcmp(pin, "version") == 0) {
+                AppBlynk::postData(pin, VERSION);
+            };
+            if (strcmp(pin, "temperature") == 0) {
+                AppBlynk::postData(pin, Sensor::temperatureGet());
+            };
+            if (strcmp(pin, "humidity") == 0) {
+                AppBlynk::postData(pin, Sensor::humidityGet());
+            };
+            if (strcmp(pin, "light") == 0) {
+                AppBlynk::postData(pin, Relay::isLightOn() ? 255 : 0);
+            };
+            if (strcmp(pin, "ventilation") == 0) {
+                AppBlynk::postData(pin, Relay::isVentilationOn() ? 255 : 0);
+            };
+            if (strcmp(pin, "wind") == 0) {
+                AppBlynk::postData(pin, Relay::isWindOn() ? 255 : 0);
+            };
+            if (strcmp(pin, "rtcBattery") == 0) {
+                AppBlynk::postData(pin, AppTime::RTCBattery() ? 255 : 0);
+            };
+            if (strcmp(pin, "rtcTemperature") == 0) {
+                AppBlynk::postData(pin, AppTime::RTCGetTemperature());
+            };
+            if (strcmp(pin, "humidityWater") == 0) {
+                AppBlynk::postData(pin, Sensor::humidityHasWater() ? 255 : 0);
+            };
+            if (strcmp(pin, "soilMoisture1") == 0) {
+                AppBlynk::postData(pin, Sensor::getSoilMoisture(SOIL_SENSOR_1));
+            };
+            if (strcmp(pin, "soilMoisture2") == 0) {
+                AppBlynk::postData(pin, Sensor::getSoilMoisture(SOIL_SENSOR_2));
+            };
+            if (strcmp(pin, "soilMoisture3") == 0) {
+                AppBlynk::postData(pin, Sensor::getSoilMoisture(SOIL_SENSOR_3));
+            };
+            if (strcmp(pin, "soilMoisture4") == 0) {
+                AppBlynk::postData(pin, Sensor::getSoilMoisture(SOIL_SENSOR_4));
+            };
+            if (strcmp(pin, "watering") == 0) {
+                AppBlynk::postData(pin, Relay::isWateringOn() ? 255 : 0);
+            };
+            if (strcmp(pin, "water") == 0) {
+                AppBlynk::postData(pin, Sensor::wateringHasWater() ? 255 : 0);
+            };
+            if (strcmp(pin, "waterLeakage") == 0) {
+                AppBlynk::postData(pin, Sensor::waterLeakageDetected() ? 255 : 0);
+            };
+            if (strcmp(pin, "lightIntensity") == 0) {
+                AppBlynk::postData(pin, Light::intensity());
+            };
+            if (strcmp(pin, "door") == 0) {
+                AppBlynk::postData(pin, Sensor::doorIsOpen() ? 0 : 255);
+            };
+            if (strcmp(pin, "s1LstWtrng") == 0) {
+                AppBlynk::postData(pin, Watering::getStringVariable(pin));
+            };
+            if (strcmp(pin, "s2LstWtrng") == 0) {
+                AppBlynk::postData(pin, Watering::getStringVariable(pin));
+            };
+            if (strcmp(pin, "s3LstWtrng") == 0) {
+                AppBlynk::postData(pin, Watering::getStringVariable(pin));
+            };
+            if (strcmp(pin, "s4LstWtrng") == 0) {
+                AppBlynk::postData(pin, Watering::getStringVariable(pin));
+            };
+            if (strcmp(pin, "hLstWtrng") == 0) {
+                AppBlynk::postData(pin, Watering::getStringVariable(pin));
+            };
+            syncVariables[i].synced = true;
+            syncCounter++;
+        }
     }
 
-    AppBlynk::postData("temperature", Sensor::temperatureGet());
-    AppBlynk::postData("humidity", Sensor::humidityGet());
-    AppBlynk::postData("light", Relay::isLightOn() ? 255 : 0);
-    AppBlynk::postData("ventilation", Relay::isVentilationOn() ? 255 : 0);
-    AppBlynk::postData("wind", Relay::isWindOn() ? 255 : 0);
-    AppBlynk::postData("rtcBattery", AppTime::RTCBattery() ? 255 : 0);
-    AppBlynk::postData("rtcTemperature", AppTime::RTCGetTemperature());
-    AppBlynk::postData("humidityWater", Sensor::humidityHasWater() ? 255 : 0);
+    if (syncCounter < syncValuesPerSecond) {
+        for (int i = 0; i < varsLen; i++) {
+            syncVariables[i].synced = false;
+        }
+    }
 
 #if PRODUCTION
     bool humidityHasWater = Sensor::humidityHasWater();
@@ -286,34 +406,6 @@ void AppBlynk::syncHighFreq1() { // every 3 sec
         waterLeakageNotificationSent = false;
     }
 #endif
-}
-
-void AppBlynk::syncHighFreq2() { // every 4 sec
-    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
-        return;
-    }
-
-    AppBlynk::postData("soilMoisture1", Sensor::getSoilMoisture(SOIL_SENSOR_1));
-    AppBlynk::postData("soilMoisture2", Sensor::getSoilMoisture(SOIL_SENSOR_2));
-    AppBlynk::postData("soilMoisture3", Sensor::getSoilMoisture(SOIL_SENSOR_3));
-    AppBlynk::postData("soilMoisture4", Sensor::getSoilMoisture(SOIL_SENSOR_4));
-    AppBlynk::postData("watering", Relay::isWateringOn() ? 255 : 0);
-    AppBlynk::postData("water", Sensor::wateringHasWater() ? 255 : 0);
-    AppBlynk::postData("waterLeakage", Sensor::waterLeakageDetected() ? 255 : 0);
-    AppBlynk::postData("lightIntensity", Light::intensity());
-    AppBlynk::postData("door", Sensor::doorIsOpen() ? 0 : 255);
-}
-
-void AppBlynk::syncHighFreq3() { // every 5 sec
-    if (!AppWiFi::isConnected() || !Blynk.connected() || Tools::millisOverflowIsClose()) {
-        return;
-    }
-
-    AppBlynk::postData("s1LstWtrng", Watering::getStringVariable("s1LstWtrng"));
-    AppBlynk::postData("s2LstWtrng", Watering::getStringVariable("s2LstWtrng"));
-    AppBlynk::postData("s3LstWtrng", Watering::getStringVariable("s3LstWtrng"));
-    AppBlynk::postData("s4LstWtrng", Watering::getStringVariable("s4LstWtrng"));
-    AppBlynk::postData("hLstWtrng", Watering::getStringVariable("hLstWtrng"));
 }
 
 void writeHandler(const char *pin, int value, bool store) {
@@ -422,27 +514,36 @@ BLYNK_CONNECTED() {
 
 // public
 
-void AppBlynk::setVariable(int *var, const char *pin, bool store) {
+void AppBlynk::setVariable(int *var, const char *pin) {
     int varsCount = *(&intVariables + 1) - intVariables;
     for (int i = 0; i < varsCount; i++) {
         if (!intVariables[i].pin) {
-            intVariables[i] = BlynkIntVariable(var, pin, store);
+            intVariables[i] = BlynkIntVariable(var, pin);
             break;
         }
     }
 }
 
-void AppBlynk::setVariable(String *var, const char *pin, bool store) {
+void AppBlynk::setVariable(String *var, const char *pin) {
     int varsCount = *(&stringVariables + 1) - stringVariables;
     for (int i = 0; i < varsCount; i++) {
         if (!stringVariables[i].pin) {
-            stringVariables[i] = BlynkStringVariable(var, pin, store);
+            stringVariables[i] = BlynkStringVariable(var, pin);
             break;
         }
     }
 }
 
 void AppBlynk::checkConnect() {
+    DEBUG_PRINTLN("Check connect:");
+    DEBUG_PRINT("Wifi connected: ");
+    DEBUG_PRINTLN(AppWiFi::isConnected());
+    DEBUG_PRINT("Blynk connected: ");
+    DEBUG_PRINTLN(Blynk.connected());
+    DEBUG_PRINT("Millis: ");
+    DEBUG_PRINTLN(millis());
+    DEBUG_PRINT("Overflow is close: ");
+    DEBUG_PRINTLN(Tools::millisOverflowIsClose());
     if (!blynkConnectAttemptFirstTime && Tools::millisOverflowIsClose()) {
         return;
     }
@@ -457,7 +558,6 @@ void AppBlynk::checkConnect() {
         }
         if (Blynk.connected() && blynkConnectAttemptFirstTime) {
             blynkTerminal.clear();
-            sync();
         }
         blynkConnectAttemptFirstTime = false;
     }
@@ -500,7 +600,7 @@ void AppBlynk::getData(String &localVariable, const char *pinId, String pinData,
     }
 }
 
-void AppBlynk::postData(String pinId, int value) {
+void AppBlynk::postData(const char *pinId, int value) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (blynkPin == -1) {
         return;
@@ -514,7 +614,7 @@ void AppBlynk::postData(String pinId, int value) {
     }
 }
 
-void AppBlynk::postData(String pinId, String value) {
+void AppBlynk::postData(const char *pinId, String value) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (blynkPin == -1) {
         return;
@@ -528,7 +628,7 @@ void AppBlynk::postData(String pinId, String value) {
     }
 }
 
-void AppBlynk::postDataNoCache(String pinId, int value) {
+void AppBlynk::postDataNoCache(const char *pinId, int value) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (blynkPin == -1) {
         return;
@@ -538,7 +638,7 @@ void AppBlynk::postDataNoCache(String pinId, int value) {
     }
 }
 
-void AppBlynk::postDataNoCache(String pinId, String value) {
+void AppBlynk::postDataNoCache(const char *pinId, String value) {
     int blynkPin = AppBlynk::getPinById(pinId);
     if (blynkPin == -1) {
         return;

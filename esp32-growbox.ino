@@ -67,10 +67,7 @@ int s3WtrngAuto = 0;
 int s4WtrngAuto = 0;
 int hWtrngAuto = 0;
 
-const unsigned long blynkSyncInterval = 60UL * 1000UL;  // sync blynk low freq state every 60 seconds
-const unsigned long blynkSyncHighFreqInterval = 3UL * 1000UL;  // sync blynk high freq state every 3 seconds
-const unsigned long blynkSyncHighFreqInterval2 = 4UL * 1000UL; // 4 sec
-const unsigned long blynkSyncHighFreqInterval3 = 5UL * 1000UL; // 5 sec
+const unsigned long blynkSyncInterval = 2UL * 1000UL;  // sync blynk state every second
 const unsigned long blynkCheckConnectInterval = 30UL * 1000UL;  // check blynk connection every 30 seconds
 
 const unsigned long uptimePrintInterval = 1UL * 1000UL;
@@ -228,19 +225,16 @@ void setup() {
     Light::setVariable(&lightMaxInt, "lightMaxInt");
     Light::setIntensity();
 
-    timer.setInterval(sensorsReadInterval, sensorsRead);
-    timer.setInterval(hourCheckInterval, hourCheck);
-    timer.setInterval(ventilationProphylaxisInterval, Relay::ventilationProphylaxis);
-    timer.setInterval(wateringInterval, Watering::check);
-    timer.setInterval(wateringProgressCheckInterval, Watering::checkProgress);
-    timer.setInterval(screenRefreshInterval, Screen::refresh);
-    timer.setInterval(setIntensityInterval, Light::setIntensity);
-    timer.setInterval(otaCheckUpdateInterval, otaUpdateHandler);
-    timer.setInterval(blynkCheckConnectInterval, AppBlynk::checkConnect);
-    timer.setInterval(blynkSyncInterval, AppBlynk::sync);
-    timer.setInterval(blynkSyncHighFreqInterval, AppBlynk::syncHighFreq1);
-    timer.setInterval(blynkSyncHighFreqInterval2, AppBlynk::syncHighFreq2);
-    timer.setInterval(blynkSyncHighFreqInterval3, AppBlynk::syncHighFreq3);
+    timer.setInterval("sensorRead", sensorsReadInterval, sensorsRead);
+    timer.setInterval("hourCheck", hourCheckInterval, hourCheck);
+    timer.setInterval("ventilationProphylaxis", ventilationProphylaxisInterval, Relay::ventilationProphylaxis);
+    timer.setInterval("watering", wateringInterval, Watering::check);
+    timer.setInterval("wateringProgress", wateringProgressCheckInterval, Watering::checkProgress);
+    timer.setInterval("screenRefresh", screenRefreshInterval, Screen::refresh);
+    timer.setInterval("lightIntensity", setIntensityInterval, Light::setIntensity);
+    timer.setInterval("ota", otaCheckUpdateInterval, otaUpdateHandler);
+    timer.setInterval("blynkCheckConnect", blynkCheckConnectInterval, AppBlynk::checkConnect);
+    timer.setInterval("blynkSync", blynkSyncInterval, AppBlynk::sync);
 }
 
 void loop() {

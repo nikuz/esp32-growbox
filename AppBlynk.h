@@ -6,21 +6,24 @@
 struct BlynkIntVariable {
     int *var;
     const char *pin;
-    bool store;
 
     BlynkIntVariable() {}
 
-    BlynkIntVariable(int *_var, const char *_pin, bool _store = true) : var(_var), pin(_pin), store(_store) {}
+    BlynkIntVariable(int *_var, const char *_pin) : var(_var), pin(_pin) {}
 };
 
 struct BlynkStringVariable {
     String *var;
     const char *pin;
-    bool store;
 
     BlynkStringVariable() {}
 
-    BlynkStringVariable(String *_var, const char *_pin, bool _store = true) : var(_var), pin(_pin), store(_store) {}
+    BlynkStringVariable(String *_var, const char *_pin) : var(_var), pin(_pin) {}
+};
+
+struct BlynkSyncVariable {
+    const char *pin;
+    bool synced;
 };
 
 class AppBlynk {
@@ -33,21 +36,21 @@ public:
 
     static void run();
 
-    static void setVariable(int *var, const char *pin, bool store = true);
+    static void setVariable(int *var, const char *pin);
 
-    static void setVariable(String *var, const char *pin, bool store = true);
+    static void setVariable(String *var, const char *pin);
 
     static void getData(int &localVariable, const char *pinId, int pinData, const bool storePreferences = true);
 
     static void getData(String &localVariable, const char *pinId, String pinData, const bool storePreferences = true);
 
-    static void postData(String pinId, int value);
+    static void postData(const char *pinId, int value);
 
-    static void postData(String pinId, String value);
+    static void postData(const char *pinId, String value);
 
-    static void postDataNoCache(String pinId, int value);
+    static void postDataNoCache(const char *pinId, int value);
 
-    static void postDataNoCache(String pinId, String value);
+    static void postDataNoCache(const char *pinId, String value);
 
     static int &getIntVariable(const char *pin);
 
@@ -73,18 +76,12 @@ public:
 
     static void sync();
 
-    static void syncHighFreq1();
-
-    static void syncHighFreq2();
-
-    static void syncHighFreq3();
-
 private:
-    static int getPinById(String pinId);
+    static int getPinById(const char *pinId);
 
-    static int &getIntCacheValue(String pinId);
+    static int &getIntCacheValue(const char *pinId);
 
-    static String &getStringCacheValue(String pinId);
+    static String &getStringCacheValue(const char *pinId);
 };
 
 #endif /* AppBlynk_h */

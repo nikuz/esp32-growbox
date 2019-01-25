@@ -12,11 +12,11 @@
 static WateringIntVariable intVariables[10];
 static WateringStringVariable stringVariables[10];
 static WateringTargetVariable targetVariables[] = {
-    {"s1", "s1LstWtrng", "s1WtrngAuto"},
-    {"s2", "s2LstWtrng", "s2WtrngAuto"},
-    {"s3", "s3LstWtrng", "s3WtrngAuto"},
-    {"s4", "s4LstWtrng", "s4WtrngAuto"},
-    {"sHumidity", "hLstWtrng", "hWtrngAuto"}
+    {"s1",        "s1LstWtrng", "s1WtrngAuto"},
+    {"s2",        "s2LstWtrng", "s2WtrngAuto"},
+    {"s3",        "s3LstWtrng", "s3WtrngAuto"},
+    {"s4",        "s4LstWtrng", "s4WtrngAuto"},
+    {"sHumidity", "hLstWtrng",  "hWtrngAuto"}
 };
 static int blankIntVariable = -1;
 static String blankStringVariable = "";
@@ -403,7 +403,7 @@ void Watering::stop() {
 }
 
 void Watering::checkProgress() {
-    if (noWaterOrLeakageDetected() || Tools::millisOverflowIsClose()) {
+    if (noWaterOrLeakageDetected() || (wateringStarted && Tools::millisOverflowIsClose())) {
         Watering::stop();
         return;
     }
