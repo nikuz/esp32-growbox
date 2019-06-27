@@ -420,42 +420,42 @@ void writeHandler(const char *pin, String value, bool store) {
 
 BLYNK_WRITE(V6) { // lightDayStart
     writeHandler("lightDayStart", param.asInt(), true);
-}
+};
 BLYNK_WRITE(V7) { // lightDayEnd
     writeHandler("lightDayEnd", param.asInt(), true);
-}
+};
 BLYNK_WRITE(V8) { // ventTempMax
     writeHandler("ventTempMax", param.asInt(), true);
-}
+};
 BLYNK_WRITE(V14) { // ventHumMax
     writeHandler("ventHumMax", param.asInt(), true);
-}
+};
 BLYNK_WRITE(V20) { // otaHost
     writeHandler("otaHost", param.asStr(), true);
-}
+};
 BLYNK_WRITE(V21) { // otaBin
     writeHandler("otaBin", param.asStr(), true);
-}
+};
 BLYNK_WRITE(V23) { // wSoilMstrMin
     writeHandler("wSoilMstrMin", param.asInt(), true);
-}
+};
 BLYNK_WRITE(V26) { // lightMaxInt
     writeHandler("lightMaxInt", param.asInt(), true);
-}
+};
 BLYNK_WRITE(V29) { // autoWatering
     int value = param.asInt();
     if (value == 0) {
         Watering::stop();
     }
-    writeHandler("autoWatering", value, false);
-}
+    writeHandler("autoWatering", value, true);
+};
 BLYNK_WRITE(V38) {
     int value = param.asInt();
     if (value == 0) {
         Watering::stop();
     }
     writeHandler("s1WtrngAuto", value, false);
-}
+};
 
 BLYNK_WRITE(V39) {
     int value = param.asInt();
@@ -463,7 +463,7 @@ BLYNK_WRITE(V39) {
         Watering::stop();
     }
     writeHandler("s2WtrngAuto", value, false);
-}
+};
 
 BLYNK_WRITE(V40) {
     int value = param.asInt();
@@ -471,7 +471,7 @@ BLYNK_WRITE(V40) {
         Watering::stop();
     }
     writeHandler("s3WtrngAuto", value, false);
-}
+};
 
 BLYNK_WRITE(V41) {
     int value = param.asInt();
@@ -479,7 +479,7 @@ BLYNK_WRITE(V41) {
         Watering::stop();
     }
     writeHandler("s4WtrngAuto", value, false);
-}
+};
 
 BLYNK_WRITE(V42) {
     int value = param.asInt();
@@ -487,30 +487,30 @@ BLYNK_WRITE(V42) {
         Watering::stop();
     }
     writeHandler("hWtrngAuto", value, false);
-}
+};
 BLYNK_WRITE(V10) { // ping
     if (param.asInt() == 1) {
         Blynk.notify("PONG");
         Blynk.virtualWrite(V10, 0);
     }
-}
+};
 BLYNK_WRITE(V13) { // get time
     if (param.asInt() == 1) {
         AppTime::print();
         Blynk.virtualWrite(V13, 0);
     }
-}
+};
 BLYNK_WRITE(V31) { // restart
     if (param.asInt() == 1) {
         Blynk.virtualWrite(V31, 0);
         delay(2000);
         ESP.restart();
     }
-}
+};
 
 BLYNK_CONNECTED() {
     Blynk.syncAll();
-}
+};
 
 // public
 

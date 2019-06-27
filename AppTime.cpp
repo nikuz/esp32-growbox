@@ -185,7 +185,7 @@ struct tm AppTime::getTmFromString(const char *value) {
             tm_year: year - 1900,
             tm_wday: 0,
             tm_yday: 0,
-            tm_isdst: 0
+            tm_isdst: -1
     };
 
     return dateTime;

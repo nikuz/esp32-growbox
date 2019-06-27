@@ -26,9 +26,9 @@ char wateringStartedFor[10];
 
 bool mainWateringStarted = false;
 struct tm mainWateringStartedAt = {0};
-const int mainWateringTime = 30;           // 30 sec
-const int mainWateringTimeHumidity = 50;   // 50 sec
-const int waitBetweenWatering = 60 * 5;           // 5 mins
+const int mainWateringTime = 30;                // 30 sec
+const int mainWateringTimeHumidity = 60 * 5;    // 5 min
+const int waitBetweenWatering = 60 * 5;         // 5 min
 bool mainWateringPassed = false;
 
 bool moistureRecheckPassed = false;
@@ -125,8 +125,7 @@ void printLastWateringTime(char *name, double prevWateringSec) {
 }
 
 bool noWaterOrLeakageDetected() {
-//    return !Sensor::wateringHasWater() || Sensor::waterLeakageDetected();
-    return Sensor::waterLeakageDetected();
+    return !Sensor::wateringHasWater() || Sensor::waterLeakageDetected();
 }
 
 // stopping (8 stage)
@@ -151,16 +150,16 @@ void mainWatering() {
     if (!wateringForHumidity && !moistureRecheckPassed) {
         return;
     }
+    const int wateringTime = wateringForHumidity ? mainWateringTimeHumidity : mainWateringTime;
     if (!mainWateringStarted) {
         Relay::wateringOn();
         mainWateringStarted = true;
         mainWateringStartedAt = AppTime::getCurrentTime();
         AppBlynk::print("Start main watering for: ");
-        AppBlynk::print(mainWateringTime);
+        AppBlynk::print(wateringTime);
         AppBlynk::println("s");
         return;
     }
-    const int wateringTime = wateringForHumidity ? mainWateringTimeHumidity : mainWateringTime;
     if (AppTime::compareDates(mainWateringStartedAt, AppTime::getCurrentTime()) >= wateringTime) {
         Relay::wateringOff();
         AppBlynk::println("Stop main watering");
@@ -394,11 +393,12 @@ void Watering::stop() {
     waitingBeforeMoistureRecheckStarted = false;
     waitingBeforeMoistureRecheckStartedAt = {0};
     waitingBeforeMoistureRecheckPassed = false;
+    moistureRecheckPassed = false;
     mainWateringStarted = false;
     mainWateringStartedAt = {0};
     mainWateringPassed = false;
     memset(wateringStartedFor, 0, sizeof wateringStartedFor);
-    moistureStarted = {0};
+    moistureStarted = 0;
     wateringStarted = false;
 }
 

@@ -31,6 +31,7 @@ void Screen::initiate() {
     u8g2.clearBuffer();
     u8g2.setCursor((displayWidth / 2) - (strWidth / 2), displayHeight / 2);
     u8g2.print(loadingStr);
+//    u8g2.drawFrame(0, 0, u8g2.getDisplayWidth(), u8g2.getDisplayHeight());
     u8g2.sendBuffer();
 }
 

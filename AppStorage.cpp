@@ -77,7 +77,7 @@ void AppStorage::restore() {
             }
         }
         int stringVarsLen = *(&stringVariables + 1) - stringVariables;
-        for (int i = 0; i < intVarsLen; i++) {
+        for (int i = 0; i < stringVarsLen; i++) {
             if (stringVariables[i].key) {
                 *stringVariables[i].var = preferences.getString(stringVariables[i].key, *stringVariables[i].var);
             }
